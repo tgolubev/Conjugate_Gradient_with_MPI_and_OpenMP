@@ -23,8 +23,13 @@ int main(int argc, char **argv)
    MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
    MPI_Comm_rank (MPI_COMM_WORLD, &rank);
    
-   mat A = { { 4, 1 }, { 1, 3 } };
-   vec b = { 1, 2 };
+   mat A = { { 4, 1, 3, 4}, { 1, 3 , 4, 5}, { 1, 3 , 4, 5}, { 1, 3 , 4, 5}};
+   vec b = { 1, 2, 3, 4 };
+
+   // NOTE: currently the matrix sizes must evenly divide into nprocs...
+
+   // note: make sure matrix is big enough for thenumber of processors you are using!
+
    
    vec x = conj_grad_solver(A, b);  // domain decomposition is done inside the solver
    

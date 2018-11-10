@@ -98,27 +98,31 @@ vec conj_grad_solver(const mat &A, const vec &b)
    // this is #rows/nprocs for the row #, and column # is same as in A
    //NOTE: WILL LATER NEED TO ACCOUNT FOR POSSIBILITY THAT ROWS DON'T EVENLY DIVIDE INTO THE NPROCS!!
    for (int i = 0; i < m/nprocs; i++)
-       for (int j = 0; j < m/nprocs; j++)
+       for (int j = 0; j < A[0].size(); j++)
          sub_A[i][j] = A[rank * m/nprocs + i][j];
 
-   std::cout << "sub_A " << std::endl;
-   print(sub_A);
-   std::cout << "A " << std::endl;
-   print(A);
-
-   // with 1 proc, subA and A are correct here...
+   // decomposition is correct now!!
 
    double tolerance = 1.0e-10;
 
-   int n = sub_A.size();
+   int n = A.size();
    vec sub_x(n/nprocs); // iniitalize a vector to store the solution subvector
    vec x(n);
    // we want a decomposed r
 
    vec sub_r(m/nprocs);  
-   for (int i = 0; i < m; i++)
-        sub_r[i] = b[m*rank + i];
+   for (int i = 0; i < m/nprocs; i++)
+        sub_r[i] = b[(m/nprocs)*rank + i];
 
+
+   if(rank  == 0) {
+       std::cout << "sub_A " << std::endl;
+       print(sub_A);
+       std::cout << "A " << std::endl;
+       print(A);
+       std::cout << "sub_r " << std::endl;
+       print(sub_r);
+    }
    
    // BUT NEED TO TAKE INTO  ACCOUNT THAT b could be not evenenly  divisible by nprocs!
    // MAYBE DEAL WITH THIS ISSUE LATER
@@ -128,9 +132,11 @@ vec conj_grad_solver(const mat &A, const vec &b)
    vec sub_p = sub_r; //also we want a sub_p, decomposed to be able to split up the work
    vec r_old;
    vec sub_a_times_p;
-   // SEEMS TO BLOW UP ON THE SECOND ITERATION!!!
-   for (int i = 0; i < n; i++) {  // this loop must be serial b/c is iterations of conj_grad 
-       // THIS MIGHT MAKE MORE SENSE TO BE i< max_iter, but I guess can use n = a.size() for max iter?
+
+   for (int i = 0; i < n; i++) {  // this loop must be serial b/c is iterations of conj_grad
+       // note: make sure matrix is big enough for thenumber of processors you are using!
+
+      std:: cout << "iter " << i << std::endl;
       r_old = sub_r;                                         // Store previous residual
       // here we want to use a split r!
       
@@ -143,7 +149,9 @@ vec conj_grad_solver(const mat &A, const vec &b)
       // mpi_dot_product will perform a reduction over the sub vectors to give back the full vector!
       double alpha = mpi_dot_product(sub_r, sub_r)/std::max(mpi_dot_product(sub_p, sub_a_times_p), tolerance);
 
-      
+      std::cout << "sub_x before" << std::endl;
+      print(sub_x);
+
       // Next estimate of solution  // this is like saxpy: use CUDA
       sub_x = vec_lin_combo(1.0, sub_x, alpha, sub_p );             // note: sub_x is a buffer where the solution goes
       // this will also only return a sub vector of x...
@@ -158,6 +166,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
 
 
       // Convergence test
+
       if (mpi_vector_norm(sub_r) < tolerance)  // vector norm needs to use a all reduce!
           break;
 
@@ -172,8 +181,14 @@ vec conj_grad_solver(const mat &A, const vec &b)
       print(sub_p);
 
       // WE NEED TO UPDATE THE p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
-      MPI_Gatherv(&sub_p.front(), row_cnt[rank], MPI_DOUBLE, &p.front(), row_cnt, row_disp, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+      MPI_Allgatherv(&sub_p.front(), row_cnt[rank], MPI_DOUBLE, &p.front(), row_cnt, row_disp, MPI_DOUBLE, MPI_COMM_WORLD);
+      // need an Allgatherv b/c all procs need the p vector
 
+      std::cout << " p after gatherv" << std::endl;
+      print(p);
+
+      // it get's past this gather on multi procs!!
+      // gathered p is printed correctly!!
    }
 
    // need a final gather to get back to full x...
