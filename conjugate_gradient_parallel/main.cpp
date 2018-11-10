@@ -26,10 +26,7 @@ int main(int argc, char **argv)
    mat A = { { 4, 1 }, { 1, 3 } };
    vec b = { 1, 2 };
    
-   // Domain decomposition will be done here, so we will only pass the sub-matrices to the conj_grad_solver.
-   // However we will pass the entire b vector (at least for now), b/c it is needed for the multiplication...
-
-   vec x = conj_grad_solver( A, b );
+   vec x = conj_grad_solver(A, b);  // domain decomposition is done inside the solver
    
    if (rank == 0) {
    

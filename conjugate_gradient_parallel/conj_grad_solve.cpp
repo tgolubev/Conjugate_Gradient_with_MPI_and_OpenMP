@@ -64,7 +64,7 @@ void mpi_vector_norm(const vec &sub_v, double norm_r)
 }
 
 
-vec conj_grad_solver(const mat &sub_A, const vec &b)
+vec conj_grad_solver(const mat &A, const vec &b)
 {
     
    // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
@@ -73,6 +73,9 @@ vec conj_grad_solver(const mat &sub_A, const vec &b)
    int nprocs, rank;
    MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
    MPI_Comm_rank (MPI_COMM_WORLD, &rank);
+
+
+   // Domain decomposition
    int row_cnt[nprocs];  // to keep track of # of rows in each rank, when not evenly divisible, this can be different
    int row_disp[nprocs];  // displacement from start of vector, needed for gatherv
    int m = b.size();
@@ -82,7 +85,13 @@ vec conj_grad_solver(const mat &sub_A, const vec &b)
        row_disp[i] = i * m/nprocs;  // NOTE: this is assuming that rank 0 is also doing work. LATER I MIGHT MAKE rank 0 be a master and only doing initializations.
    }
 
-
+   mat sub_A(m/nprocs, std::vector<double> (A[0].size()));  // note: this is the correct way to initialize a vector of vectors.
+   // note: A[0].size() gives # of elements in 1st row = # of columns
+   // this is #rows/nprocs for the row #, and column # is same as in A
+   //NOTE: WILL LATER NEED TO ACCOUNT FOR POSSIBILITY THAT ROWS DON'T EVENLY DIVIDE INTO THE NPROCS!!
+   for (int i = 0; i < m/nprocs; i++)
+       for (int j = 0; j < m/nprocs; j++)
+         sub_A[i][j] = A[rank * m/nprocs + i][j];
 
    double tolerance = 1.0e-10;
 
@@ -99,7 +108,7 @@ vec conj_grad_solver(const mat &sub_A, const vec &b)
    // BUT NEED TO TAKE INTO  ACCOUNT THAT b could be not evenenly  divisible by nprocs!
    // MAYBE DEAL WITH THIS ISSUE LATER
    
-   
+   //---------------------------------------------------------------------------------------------------------
    vec p = b;  //we want a full p
    vec sub_p = sub_r; //also we want a sub_p, decomposed to be able to split up the work
    
@@ -114,7 +123,7 @@ vec conj_grad_solver(const mat &sub_A, const vec &b)
       // NOTE: a_times_p will only be a part of the full A*p for >1proc
       
       double r_dot_r = 0;
-      double p_dot_a_times_p;
+      double p_dot_a_times_p = 0;
       mpi_dot_product(sub_r, sub_r, r_dot_r); // 3rd argument is the buffer where the result will be stored. Recall this does an all reduce!!
       mpi_dot_product(sub_p, sub_a_times_p, p_dot_a_times_p);
       // mpi_dot_product will perform a reduction over the sub vectors to give back the full vector!
