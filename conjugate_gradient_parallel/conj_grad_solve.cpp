@@ -149,9 +149,6 @@ vec conj_grad_solver(const mat &A, const vec &b)
       // mpi_dot_product will perform a reduction over the sub vectors to give back the full vector!
       double alpha = mpi_dot_product(sub_r, sub_r)/std::max(mpi_dot_product(sub_p, sub_a_times_p), tolerance);
 
-      std::cout << "sub_x before" << std::endl;
-      print(sub_x);
-
       // Next estimate of solution  // this is like saxpy: use CUDA
       sub_x = vec_lin_combo(1.0, sub_x, alpha, sub_p );             // note: sub_x is a buffer where the solution goes
       // this will also only return a sub vector of x...
