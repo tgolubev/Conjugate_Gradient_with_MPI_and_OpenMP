@@ -1,4 +1,5 @@
 #include "conj_grad_solve.hpp"
+#include "IO.hpp"
 
 using vec = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
@@ -39,14 +40,18 @@ double dot_product(const vec &u, const vec &v)
 
 
 // performs a reduction over the sub-vectors which are passed to it... All_Reduce broadcasts the value to all procs
-void mpi_dot_product(const vec &sub_u, const vec &sub_v, double product) // need to pass it the buffer where to keep the result
+double mpi_dot_product(const vec &sub_u, const vec &sub_v) // need to pass it the buffer where to keep the result
 {
+   double product;
    double sub_prod = inner_product(sub_u.begin(), sub_u.end(), sub_v.begin(), 0.0); // last argument is initial value of the sum of products
-   
+   // sub_prod works!
+   //std::cout << "sub_prod" << sub_prod << std::endl;
    // LATER the inner_product will be replaced by CUDA to further divide up the work
    
    // do a reduction over sub_prod to get the total dot product
    MPI_Allreduce(&sub_prod, &product, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+   return product;
 }
 
 // vector norm
@@ -55,12 +60,15 @@ double vector_norm(const vec &v)
    return sqrt(dot_product(v, v));
 }
 
-void mpi_vector_norm(const vec &sub_v, double norm_r)
+double mpi_vector_norm(const vec &sub_v)
 {
+   double norm_r;
    double sub_prod = inner_product(sub_v.begin(), sub_v.end(), sub_v.begin(), 0.0);
    MPI_Allreduce(&sub_prod, &norm_r, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
    
    norm_r = sqrt(norm_r);
+
+   return norm_r;
 }
 
 
@@ -93,6 +101,13 @@ vec conj_grad_solver(const mat &A, const vec &b)
        for (int j = 0; j < m/nprocs; j++)
          sub_A[i][j] = A[rank * m/nprocs + i][j];
 
+   std::cout << "sub_A " << std::endl;
+   print(sub_A);
+   std::cout << "A " << std::endl;
+   print(A);
+
+   // with 1 proc, subA and A are correct here...
+
    double tolerance = 1.0e-10;
 
    int n = sub_A.size();
@@ -111,44 +126,54 @@ vec conj_grad_solver(const mat &A, const vec &b)
    //---------------------------------------------------------------------------------------------------------
    vec p = b;  //we want a full p
    vec sub_p = sub_r; //also we want a sub_p, decomposed to be able to split up the work
-   
+   vec r_old;
+   vec sub_a_times_p;
+   // SEEMS TO BLOW UP ON THE SECOND ITERATION!!!
    for (int i = 0; i < n; i++) {  // this loop must be serial b/c is iterations of conj_grad 
        // THIS MIGHT MAKE MORE SENSE TO BE i< max_iter, but I guess can use n = a.size() for max iter?
-      vec r_old = sub_r;                                         // Store previous residual
+      r_old = sub_r;                                         // Store previous residual
       // here we want to use a split r!
       
-      
-      vec sub_a_times_p = mat_times_vec(sub_A, p);  //split up with MPI and then finer parallelize with CUDA--> 
+      sub_a_times_p = mat_times_vec(sub_A, p);  //split up with MPI and then finer parallelize with CUDA-->
       //means have multiple GPU's --> 1 corresponding to each CPU
       // NOTE: a_times_p will only be a part of the full A*p for >1proc
       
-      double r_dot_r = 0;
-      double p_dot_a_times_p = 0;
-      mpi_dot_product(sub_r, sub_r, r_dot_r); // 3rd argument is the buffer where the result will be stored. Recall this does an all reduce!!
-      mpi_dot_product(sub_p, sub_a_times_p, p_dot_a_times_p);
-      // mpi_dot_product will perform a reduction over the sub vectors to give back the full vector!
+      // SUB R IS CORRECT HERE, = b in the 1st iter
 
-      double alpha = r_dot_r/std::max(p_dot_a_times_p, tolerance);   
+      // mpi_dot_product will perform a reduction over the sub vectors to give back the full vector!
+      double alpha = mpi_dot_product(sub_r, sub_r)/std::max(mpi_dot_product(sub_p, sub_a_times_p), tolerance);
+
       
       // Next estimate of solution  // this is like saxpy: use CUDA
       sub_x = vec_lin_combo(1.0, sub_x, alpha, sub_p );             // note: sub_x is a buffer where the solution goes
       // this will also only return a sub vector of x...
        
+      std::cout << "sub_x" << std::endl;
+      print(sub_x);
+
       sub_r = vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p);          // Residual                   // again like saxpy: use CUDA
 
-      double norm_r = 0;
-      // Convergence test
-      mpi_vector_norm(sub_r, norm_r);
-      if (norm_r < tolerance)  // vector norm needs to use a all reduce!
-          break;             
+      std::cout << "sub_r" << std::endl;
+      print(sub_r);
 
-      r_dot_r = 0;
-      double r_old_dot_r_old = 0;
-      mpi_dot_product(sub_r, sub_r, r_dot_r);
-      mpi_dot_product(r_old, r_old, r_old_dot_r_old);
+
+      // Convergence test
+      if (mpi_vector_norm(sub_r) < tolerance)  // vector norm needs to use a all reduce!
+          break;
+
+      std::cout <<  "sub r norm " << mpi_vector_norm(sub_r) << std::endl;
       
-      double beta = r_dot_r/std::max(r_old_dot_r_old, tolerance);     
+      double beta = mpi_dot_product(sub_r, sub_r)/std::max(mpi_dot_product(r_old, r_old), tolerance);
+      std::cout << "beta" << beta << std::endl;
+
       sub_p = vec_lin_combo(1.0, sub_r, beta, sub_p);             // Next gradient                     // again like saxpy: use CUDA
+
+      std::cout << "sub_p" << std::endl;
+      print(sub_p);
+
+      // WE NEED TO UPDATE THE p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
+      MPI_Gatherv(&sub_p.front(), row_cnt[rank], MPI_DOUBLE, &p.front(), row_cnt, row_disp, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
    }
 
    // need a final gather to get back to full x...

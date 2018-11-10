@@ -15,5 +15,5 @@ vec mat_times_vec(const std::vector<vec> &A, const vec &v);
 vec vec_lin_combo(double a, const vec &u, double b, const vec &v);
 double dot_product(const vec &u, const vec &v);
 double vector_norm(const vec &v);
-void mpi_dot_product(const vec &sub_u, const vec &sub_v, double product);
-void mpi_vector_norm(const vec &sub_v, double norm_r);
+double mpi_dot_product(const vec &sub_u, const vec &sub_v, double product);
+double mpi_vector_norm(const vec &sub_v, double norm_r);
