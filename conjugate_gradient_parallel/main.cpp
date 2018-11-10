@@ -15,10 +15,11 @@ using vec = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
 
-int main()
+int main(int argc, char **argv)
 {
     
-   MPI_Init (&nargs, &args);
+   MPI_Init (&argc, &argv);
+   int nprocs, rank;
    MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
    MPI_Comm_rank (MPI_COMM_WORLD, &rank);
    
