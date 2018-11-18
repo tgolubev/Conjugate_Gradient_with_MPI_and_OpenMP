@@ -7,8 +7,9 @@
 #include <numeric>
 
 using vec    = std::vector<double>;         // vector
-using matrix = std::vector<vec>;            // matrix (=collection of (row) vectors)
+using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
 void print(const vec &V);
 
-void print(const matrix &A);
+void print(const mat &A);
+mat read_matrix(const unsigned int n);

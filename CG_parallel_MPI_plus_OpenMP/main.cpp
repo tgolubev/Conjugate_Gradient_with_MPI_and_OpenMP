@@ -10,6 +10,7 @@
 #include <chrono>
 #include <stdlib.h>
 #include <stddef.h>
+#include <omp.h>
 
 #include "IO.hpp"
 #include "conj_grad_solve.hpp"
@@ -20,13 +21,23 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 
 
 int main(int argc, char **argv)
-{
-    
+{   
+    int n =  100;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
+
+    // test openmp by printing out number of threads we have
+    # pragma omp parallel
+    {
+       printf("Num OpenMP threads: %d\n", omp_get_num_threads());
+    }
+
    MPI_Init (&argc, &argv);
    int nprocs, rank;
    MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
    MPI_Comm_rank (MPI_COMM_WORLD, &rank);
-   
+
+   if (rank == 0)
+       mat A = read_matrix(n);
+
    //mat A = { { 4, 1 }, { 1, 3 } };
    //vec b = { 1, 2 };
 
@@ -82,6 +93,7 @@ int main(int argc, char **argv)
    std::chrono::duration<double> time = std::chrono::duration_cast<std::chrono::duration<double>>(finish-start);
    std::cout << " CPU time = " << time.count() << std::endl;
    
+   /*
    if (rank == 0) {
    
         std::cout << "Matrix A: " << std::endl;
@@ -97,6 +109,7 @@ int main(int argc, char **argv)
         print(mat_times_vec(A, x));
     
    }
+   */
    
    MPI_Finalize();
 }

@@ -119,6 +119,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
         sub_r[i] = b[(m/nprocs)*rank + i];
 
 
+   /*
    if(rank  == 0) {
        std::cout << "sub_A " << std::endl;
        print(sub_A);
@@ -127,6 +128,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
        std::cout << "sub_r " << std::endl;
        print(sub_r);
     }
+    */
    
    // BUT NEED TO TAKE INTO  ACCOUNT THAT b could be not evenenly  divisible by nprocs!
    // MAYBE DEAL WITH THIS ISSUE LATER
