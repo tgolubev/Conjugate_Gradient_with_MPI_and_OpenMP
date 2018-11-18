@@ -39,6 +39,5 @@
 *.pdb
 *.Debug
 *.Release
-Makefile
 *.ilk
 *.user
