@@ -23,20 +23,25 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 int main(int argc, char **argv)
 {   
     int n =  16;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
+    std::string matrix_filename = "matrix.txt";
+    std::string rhs_filename = "rhs.txt";
 
     // test openmp by printing out number of threads we have
+    /*
     # pragma omp parallel
     {
        printf("Num OpenMP threads: %d\n", omp_get_num_threads());
     }
+    */
 
    MPI_Init (&argc, &argv);
    int nprocs, rank;
    MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
    MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 
-   mat A = read_matrix(n);  // here is spot where can use hdf5 in the future for i/o
-   vec b = { -14, 1, 15, 28, 40, 51, 61, 70, 78, 85, 91, 96, 100, 103, 105, 106};
+   mat A = read_matrix(n, matrix_filename);  // here is spot where can use hdf5 in the future for i/o
+   vec b = read_vector(n, rhs_filename);
+   //vec b = { -14, 1, 15, 28, 40, 51, 61, 70, 78, 85, 91, 96, 100, 103, 105, 106};
 
    /* solution is:
     * ans =

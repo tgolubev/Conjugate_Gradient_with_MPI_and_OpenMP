@@ -32,10 +32,10 @@ void print(const mat &A)
    }
 }
 
-mat read_matrix(const unsigned int n)
+mat read_matrix(const unsigned int n, std::string filename)
 {
     std::ifstream matrix_file;
-    matrix_file.open("matrix.txt");
+    matrix_file.open(filename);
 
     // set the correct size
     mat input_mat(n, std::vector<double>(n)); // recall that mat is a vector of vectors, hence the tricky notation for initialization
@@ -46,5 +46,17 @@ mat read_matrix(const unsigned int n)
             matrix_file >> input_mat[i][j];
 
     return input_mat;
+}
 
+vec read_vector(const unsigned int n, std::string filename)
+{
+    std::ifstream vector_file;
+    vector_file.open(filename);
+
+    vec input_vec(n);
+
+    for (size_t i = 0; i < n; i++)
+        vector_file >> input_vec[i];
+
+    return input_vec;
 }

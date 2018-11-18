@@ -12,4 +12,5 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 void print(const vec &V);
 
 void print(const mat &A);
-mat read_matrix(const unsigned int n);
+mat read_matrix(const unsigned int n, std::string filename);
+vec read_vector(const unsigned int n, std::string filename);
