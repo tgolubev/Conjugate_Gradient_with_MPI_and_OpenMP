@@ -107,7 +107,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
        for (int j = 0; j < A[0].size(); j++)
          sub_A[i][j] = A[rank * m/nprocs + i][j];
 
-   double tolerance = 1.0e-10;
+   double tolerance = 1.0e-5; // seems can't converge to very low tolerance
 
    int n = A.size();
    vec sub_x(n/nprocs); // iniitalize a vector to store the solution subvector
@@ -138,11 +138,12 @@ vec conj_grad_solver(const mat &A, const vec &b)
    vec sub_p = sub_r; //also we want a sub_p, decomposed to be able to split up the work
    vec r_old;
    vec sub_a_times_p;
+   int max_iter = 100000;
 
-   for (int i = 0; i < n; i++) {  // this loop must be serial b/c is iterations of conj_grad
+   for (int i = 0; i < max_iter; i++) {  // this loop must be serial b/c is iterations of conj_grad
        // note: make sure matrix is big enough for thenumber of processors you are using!
 
-      //std:: cout << "iter " << i << std::endl;
+
       r_old = sub_r;                                         // Store previous residual
       // here we want to use a split r!
       
@@ -170,8 +171,10 @@ vec conj_grad_solver(const mat &A, const vec &b)
 
       // Convergence test
 
-      if (mpi_vector_norm(sub_r) < tolerance)  // vector norm needs to use a all reduce!
+      if (mpi_vector_norm(sub_r) < tolerance) { // vector norm needs to use a all reduce!
+          std:: cout << "Converged at iter = " << i << std::endl;
           break;
+      }
 
       //std::cout <<  "sub r norm " << mpi_vector_norm(sub_r) << std::endl;
       

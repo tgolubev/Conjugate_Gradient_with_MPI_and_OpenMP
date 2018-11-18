@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <numeric>
+#include <iomanip>
 
 using vec    = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
