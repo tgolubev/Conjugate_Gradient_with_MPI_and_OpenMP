@@ -13,11 +13,11 @@ vec mat_times_vec(const std::vector<vec> &sub_A, const vec &v)
    // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
    // since we are 1D decomposing the matrix by rows
    
-   int n = sub_A.size();
+   size_t n = sub_A.size();
    vec sub_c(n);       // for > 1proc, this will be only a sub-vector (portion of the full vector) c, b/c we are multiplying only part of A in each proc.
 
    #pragma omp parallel for
-   for (int i = 0; i < n; i++) // loop over the rows of the sub matrix
+   for (size_t i = 0; i < n; i++) // loop over the rows of the sub matrix
        sub_c[i] = dot_product(sub_A[i], v);  // dot product of ith row of sub_A with the vector v       
    
    return sub_c;
@@ -26,22 +26,21 @@ vec mat_times_vec(const std::vector<vec> &sub_A, const vec &v)
 // Linear combination of vectors
 vec vec_lin_combo(double a, const vec &u, double b, const vec &v)
 {
-   int n = u.size();
+   size_t n = u.size();
    vec w(n);
 
    #pragma omp parallel for
-   for (int j = 0; j < n; j++)
+   for (size_t j = 0; j < n; j++)
        w[j] = a * u[j] + b * v[j];
 
    return w;
 }
 
 
-
 // Inner product of u and v
 double dot_product(const vec &u, const vec &v)
 {
-   return inner_product(u.begin(), u.end(), v.begin(), 0.0);  // this can be re-written to use open mp
+   return __gnu_parallel::inner_product(u.begin(), u.end(), v.begin(), 0.0);  // leave this alone b/c is used within an already multi-threaded region
 }
 
 
@@ -49,10 +48,20 @@ double dot_product(const vec &u, const vec &v)
 double mpi_dot_product(const vec &sub_u, const vec &sub_v) // need to pass it the buffer where to keep the result
 {
    double product;
-   double sub_prod = inner_product(sub_u.begin(), sub_u.end(), sub_v.begin(), 0.0); // last argument is initial value of the sum of products
+   size_t length = sub_u.size();
+
+   // trying to parallelize this made it slower (with 10 threads, 2 procs, than w/o the parallelization!)
+   // THAT MIGHT BE B/C THE INNER PRODUCT is a very efficient implementation!! which is hard to beat.
+   //double sub_prod = 0.0;
+   /*#pragma omp parallel for reduction(+:sub_prod)
+   for (size_t i = 0; i < length; i++) {
+       sub_prod += sub_u[i] * sub_v[i];
+   }*/
+   double sub_prod = __gnu_parallel::inner_product(sub_u.begin(), sub_u.end(), sub_v.begin(), 0.0); // last argument is initial value of the sum of products
+   // using gnu_parallel instead of regular inner_product didin't really speed things up but didint' slow them down either.
+
    // sub_prod works!
    //std::cout << "sub_prod" << sub_prod << std::endl;
-   // LATER the inner_product will be replaced by CUDA to further divide up the work
    
    // do a reduction over sub_prod to get the total dot product
    MPI_Allreduce(&sub_prod, &product, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -69,7 +78,7 @@ double vector_norm(const vec &v)
 double mpi_vector_norm(const vec &sub_v)
 {
    double norm_r;
-   double sub_prod = inner_product(sub_v.begin(), sub_v.end(), sub_v.begin(), 0.0);
+   double sub_prod = __gnu_parallel::inner_product(sub_v.begin(), sub_v.end(), sub_v.begin(), 0.0);
    MPI_Allreduce(&sub_prod, &norm_r, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
    
    norm_r = sqrt(norm_r);
@@ -92,31 +101,31 @@ vec conj_grad_solver(const mat &A, const vec &b)
    // Domain decomposition
    int row_cnt[nprocs];  // to keep track of # of rows in each rank, when not evenly divisible, this can be different
    int row_disp[nprocs];  // displacement from start of vector, needed for gatherv
-   int m = b.size();
+   size_t m = b.size();
 
    for (int i = 0; i < nprocs; i++) {
        row_cnt[i] = m/nprocs;   //NOTE: later need to take care of possiblility that m may not be evenly divisible by nprocs
        row_disp[i] = i * m/nprocs;  // NOTE: this is assuming that rank 0 is also doing work. LATER I MIGHT MAKE rank 0 be a master and only doing initializations.
    }
 
-   mat sub_A(m/nprocs, std::vector<double> (A[0].size()));  // note: this is the correct way to initialize a vector of vectors.
+   mat sub_A(m/static_cast<size_t>(nprocs), std::vector<double> (A[0].size()));  // note: this is the correct way to initialize a vector of vectors.
    // note: A[0].size() gives # of elements in 1st row = # of columns
    // this is #rows/nprocs for the row #, and column # is same as in A
    //NOTE: WILL LATER NEED TO ACCOUNT FOR POSSIBILITY THAT ROWS DON'T EVENLY DIVIDE INTO THE NPROCS!!
-   for (int i = 0; i < m/nprocs; i++)
-       for (int j = 0; j < A[0].size(); j++)
-         sub_A[i][j] = A[rank * m/nprocs + i][j];
+   for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++)
+       for (size_t j = 0; j < A[0].size(); j++)
+         sub_A[i][j] = A[static_cast<size_t>(rank) * m/static_cast<size_t>(nprocs) + i][j];
 
    double tolerance = 1.0e-5; // seems can't converge to very low tolerance
 
-   int n = A.size();
-   vec sub_x(n/nprocs); // iniitalize a vector to store the solution subvector
+   size_t n = A.size();
+   vec sub_x(n/static_cast<size_t>(nprocs)); // iniitalize a vector to store the solution subvector
    vec x(n);
    // we want a decomposed r
 
-   vec sub_r(m/nprocs);  
-   for (int i = 0; i < m/nprocs; i++)
-        sub_r[i] = b[(m/nprocs)*rank + i];
+   vec sub_r(m/static_cast<size_t>(nprocs));
+   for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++)
+        sub_r[i] = b[(m/static_cast<size_t>(nprocs))*static_cast<size_t>(rank) + i];
 
 
    /*
@@ -142,7 +151,6 @@ vec conj_grad_solver(const mat &A, const vec &b)
 
    for (int i = 0; i < max_iter; i++) {  // this loop must be serial b/c is iterations of conj_grad
        // note: make sure matrix is big enough for thenumber of processors you are using!
-
 
       r_old = sub_r;                                         // Store previous residual
       // here we want to use a split r!

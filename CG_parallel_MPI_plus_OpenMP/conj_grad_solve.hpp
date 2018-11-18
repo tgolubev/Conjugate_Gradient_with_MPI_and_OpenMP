@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <numeric>
 #include <mpi.h>
-
+#include <parallel/numeric> # for using paralle versions of inner_product
 using vec    = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
