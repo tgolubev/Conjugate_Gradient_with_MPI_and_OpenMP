@@ -14,6 +14,7 @@
 
 #include "IO.hpp"
 #include "conj_grad_solve.hpp"
+#include "incomplete_cholesky.hpp"
 
 
 using vec = std::vector<double>;         // vector
@@ -22,7 +23,7 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 
 int main(int argc, char **argv)
 {   
-    int n =  500;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
+    int n =  324;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
     std::string matrix_filename = "matrix.txt";
     std::string rhs_filename = "rhs.txt";
 
@@ -34,9 +35,17 @@ int main(int argc, char **argv)
     mat A = read_matrix(n, matrix_filename);  // here is spot where can use hdf5 in the future for i/o
     vec b = read_vector(n, rhs_filename);
 
+    // NOTE: CONJUGATE GRAD WORKS MUCH NICER WITH SPARSE MATRICES, THAN DENSE ONES!!
+
+    //RECALL THAT I CAN GENERATE LAPALCIAN MATRICES WITH MATLAB, SO COULDD USE THOSE WHEN WANT TO TEST THIS WITH SPARSE MATRICES!
+
     // NOTE: when testing pick a matrix that acutally is solvable using CG. Use Matlab to test!!!
     // NOTE: currently the matrix sizes must evenly divide into nprocs...
     // note: make sure matrix is big enough for thenumber of processors you are using!
+
+    // do incomplete Cholesky factorization. Factorization function is in-place--> changes the matrix A to the factorized form.
+    // note: this currently will be done by all mpi procs--> later can split this work up among procs, if needed.
+    //incomplete_cholesky(A);  // need to check the accuracy of this
 
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
@@ -53,8 +62,8 @@ int main(int argc, char **argv)
         //std::cout << "rhs b: " << std::endl;
         // print(b);
         
-        //std::cout << "solution x: " << std::endl;
-        //print(x);
+        std::cout << "solution x: " << std::endl;
+        print(x);
 
         vec A_times_x(x.size());
         std::cout << "Check A*x = b " << std::endl;

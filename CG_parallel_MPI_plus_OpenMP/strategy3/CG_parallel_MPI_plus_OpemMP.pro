@@ -6,8 +6,10 @@ CONFIG -= qt
 SOURCES += \
         main.cpp \
     conj_grad_solve.cpp \
-    IO.cpp
+    IO.cpp \
+    incomplete_cholesky.cpp
 
 HEADERS += \
     conj_grad_solve.hpp \
-    IO.hpp
+    IO.hpp \
+    incomplete_cholesky.hpp

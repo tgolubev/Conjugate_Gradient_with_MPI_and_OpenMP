@@ -26,7 +26,7 @@ void print(const mat &A)
       for (size_t j = 0; j < n; j++)
       {
          double x = A[i][j];   
-         std::cout << x << '\t';
+         std::cout << std::fixed << std::setw(10) << std::setprecision(5) << x;
       }
       std::cout << '\n';
    }

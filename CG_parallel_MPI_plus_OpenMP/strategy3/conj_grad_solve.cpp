@@ -6,6 +6,7 @@ using vec = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
 
+
 // Matrix times vector
 void mat_times_vec(const std::vector<vec> &sub_A, const vec &v, vec &result)
 {    
