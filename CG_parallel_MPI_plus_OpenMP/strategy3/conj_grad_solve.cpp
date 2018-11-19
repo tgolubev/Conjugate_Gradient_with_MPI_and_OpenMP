@@ -7,25 +7,19 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 
 
 // Matrix times vector
-vec mat_times_vec(const std::vector<vec> &sub_A, const vec &v)
+void mat_times_vec(const std::vector<vec> &sub_A, const vec &v, vec &result)
 {    
     
    // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
    // since we are 1D decomposing the matrix by rows
    
-   size_t n = sub_A.size();
-   vec sub_c(n);       // for > 1proc, this will be only a sub-vector (portion of the full vector) c, b/c we are multiplying only part of A in each proc.
+   size_t sub_size = sub_A.size();
+   //vec sub_c(n);       // for > 1proc, this will be only a sub-vector (portion of the full vector) c, b/c we are multiplying only part of A in each proc.
 
+#pragma omp parallel for  // this is dividing the work among the rows...
+   for (size_t i = 0; i < sub_size; i++) // loop over the rows of the sub matrix
+       result[i] = dot_product(sub_A[i], v);  // dot product of ith row of sub_A with the vector v
 
-   // TRY TO SPLIT THIS sub_A further, using threads!
-   // so if sub_A[i] > 1 (> 1 row), then split it up within a parallel region, and then do a parallel dot product.
-   // smaller sub_A could result in using more cache.
-
-   #pragma omp parallel for  // this pragma helps a lot! b/c this operation is expensive....
-   for (size_t i = 0; i < n; i++) // loop over the rows of the sub matrix
-       sub_c[i] = dot_product(sub_A[i], v);  // dot product of ith row of sub_A with the vector v       
-   
-   return sub_c;
 }
 
 // Linear combination of vectors
@@ -152,7 +146,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
    vec p = b;  //we want a full p
    vec sub_p = sub_r; //also we want a sub_p, decomposed to be able to split up the work
    vec r_old;
-   vec sub_a_times_p;
+   vec sub_a_times_p(n/static_cast<size_t>(nprocs));
    int max_iter = 100000;
 
    for (int i = 0; i < max_iter; i++) {  // this loop must be serial b/c is iterations of conj_grad
@@ -161,7 +155,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
       r_old = sub_r;                                         // Store previous residual
       // here we want to use a split r!
       
-      sub_a_times_p = mat_times_vec(sub_A, p);  //split up with MPI and then finer parallelize with CUDA-->
+      mat_times_vec(sub_A, p, sub_a_times_p);  //split up with MPI and then finer parallelize with CUDA-->
       //means have multiple GPU's --> 1 corresponding to each CPU
       // NOTE: a_times_p will only be a part of the full A*p for >1proc
       
@@ -170,7 +164,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
       // mpi_dot_product will perform a reduction over the sub vectors to give back the full vector!
       double alpha = mpi_dot_product(sub_r, sub_r)/std::max(mpi_dot_product(sub_p, sub_a_times_p), tolerance);
 
-      // Next estimate of solution  // this is like saxpy: use CUDA
+      // Next estimate of solution
 //#pragma omp parallel  // trying to parallelie these 2, slightly slows it down--> to much  overhead to create threads...
 //      {
 //          int nthreads = omp_get_num_threads();
