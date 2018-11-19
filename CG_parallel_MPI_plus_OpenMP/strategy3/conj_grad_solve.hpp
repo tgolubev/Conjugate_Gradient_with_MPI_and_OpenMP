@@ -11,7 +11,7 @@ using vec    = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
 vec conj_grad_solver(const mat &A, const vec &b);
-void mat_times_vec(const std::vector<vec> &A, const vec &v, vec &result);
+vec mat_times_vec(const std::vector<vec> &A, const vec &v);
 vec vec_lin_combo(double a, const vec &u, double b, const vec &v);
 double dot_product(const vec &u, const vec &v);
 double vector_norm(const vec &v);
