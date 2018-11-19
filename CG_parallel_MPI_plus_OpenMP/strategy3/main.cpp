@@ -45,7 +45,6 @@ int main(int argc, char **argv)
     std::chrono::high_resolution_clock::time_point finish = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> time = std::chrono::duration_cast<std::chrono::duration<double>>(finish-start);
 
-
     if (rank == 0) {
 
         //std::cout << "Matrix A: " << std::endl;
@@ -56,22 +55,25 @@ int main(int argc, char **argv)
         
         //std::cout << "solution x: " << std::endl;
         //print(x);
-        
-        // WE CAN USE AN AUTOMATIC CHECK HERE LATER, TO COMPARE THE EQUALITY OF THE RESULTS, i.e. check if are < a tolerance,
-        // otherwise output an error.
 
+        vec A_times_x(x.size());
         std::cout << "Check A*x = b " << std::endl;
-        mat_times_vec(A, x, b);
-        print(b);
+        mat_times_vec(A, x, A_times_x);
+        print(A_times_x);
+
+        //------------------------- Verification Test ----------------------------------------------------------------------
+        // we will compare the A*x result to the right hand side
+        vec error(x.size());
+        for (size_t i = 0; i < x.size(); i++) {
+            error[i] = abs(A_times_x[i] - b[i]);
+        }
+        print(error);
 
         std::cout << " CPU time = " << time.count() << std::endl;
 
     }
 
-    //------------------------- Verification Test ----------------------------------------------------------------------
-
-
-
+    // use hdf5 to store the x solution and the error...
 
 
     MPI_Finalize();

@@ -11,7 +11,7 @@ void print(const vec &V)
    for (size_t i = 0; i < n; i++)
    {
       double x = V[i];   
-      std::cout << std::setprecision(10) << x << '\n';
+      std::cout << std::fixed << std::setprecision(10) << x << '\n';
    }
    std::cout<< '\n';
 }

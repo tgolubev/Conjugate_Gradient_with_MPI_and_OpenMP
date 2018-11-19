@@ -14,7 +14,7 @@ void mat_times_vec(const std::vector<vec> &sub_A, const vec &v, vec &result)
    // since we are 1D decomposing the matrix by rows
    
    size_t sub_size = sub_A.size();
-   //vec sub_c(n);       // for > 1proc, this will be only a sub-vector (portion of the full vector) c, b/c we are multiplying only part of A in each proc.
+
 
 #pragma omp parallel for  // this is dividing the work among the rows...
    for (size_t i = 0; i < sub_size; i++) // loop over the rows of the sub matrix
@@ -23,17 +23,15 @@ void mat_times_vec(const std::vector<vec> &sub_A, const vec &v, vec &result)
 }
 
 // Linear combination of vectors
-void vec_lin_combo(double a, const vec &u, double b, const vec &v, vec &result)  // this one, seems I can't avoid outputting the vector. If I try to make it void, get wrong answer!
+void vec_lin_combo(double a, const vec &u, double b, const vec &v, vec &result)
 {
    size_t n = u.size();
-   //vec w(n);
 
    //#pragma omp parallel for  //NOTE: IT IS FASTER WITHOUT THIS PRAGMA!!--> THE OPERATION ISN'T cpu intensive enough so
    // overhead of creating threads is larger than operation
    for (size_t j = 0; j < n; j++)
        result[j] = a * u[j] + b * v[j];
 
-   //return w;
 }
 
 
@@ -159,7 +157,6 @@ vec conj_grad_solver(const mat &A, const vec &b)
       mat_times_vec(sub_A, p, sub_a_times_p);  //split up with MPI and then finer parallelize with CUDA-->
       //means have multiple GPU's --> 1 corresponding to each CPU
       // NOTE: a_times_p will only be a part of the full A*p for >1proc
-      
 
 
       // mpi_dot_product will perform a reduction over the sub vectors to give back the full vector!
@@ -172,16 +169,21 @@ vec conj_grad_solver(const mat &A, const vec &b)
 
 //          if (nthreads >1) {
 //              int tid = omp_get_thread_num();
-//              if (tid == 0)
-//                  sub_x = vec_lin_combo(1.0, sub_x, alpha, sub_p );             // note: sub_x is a buffer where the solution goes
+//              if (tid == 0) {
+//                  vec_lin_combo(1.0, sub_x, alpha, sub_p, result);             // note: sub_x is a buffer where the solution goes
 //              // this will also only return a sub vector of x...
+//                  sub_x = result;
 
-//              else if (tid == 1)
-//                  sub_r = vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p);          // Residual
+//              } else if (tid == 1) {
+//                  vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p, result);          // Residual
+//                  sub_r = result;
+//              }
 //          }
 //          else {
-//                sub_x = vec_lin_combo(1.0, sub_x, alpha, sub_p );
-//                sub_r = vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p);
+//                vec_lin_combo(1.0, sub_x, alpha, sub_p, result);
+//                sub_x = result;
+//                vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p, result);
+//                sub_r = result;
 //          }
 
 //      }
