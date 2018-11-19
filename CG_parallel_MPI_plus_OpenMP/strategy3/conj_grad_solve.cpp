@@ -23,17 +23,17 @@ void mat_times_vec(const std::vector<vec> &sub_A, const vec &v, vec &result)
 }
 
 // Linear combination of vectors
-vec vec_lin_combo(double a, const vec &u, double b, const vec &v)
+void vec_lin_combo(double a, const vec &u, double b, const vec &v, vec &result)  // this one, seems I can't avoid outputting the vector. If I try to make it void, get wrong answer!
 {
    size_t n = u.size();
-   vec w(n);
+   //vec w(n);
 
    //#pragma omp parallel for  //NOTE: IT IS FASTER WITHOUT THIS PRAGMA!!--> THE OPERATION ISN'T cpu intensive enough so
    // overhead of creating threads is larger than operation
    for (size_t j = 0; j < n; j++)
-       w[j] = a * u[j] + b * v[j];
+       result[j] = a * u[j] + b * v[j];
 
-   return w;
+   //return w;
 }
 
 
@@ -146,6 +146,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
    vec p = b;  //we want a full p
    vec sub_p = sub_r; //also we want a sub_p, decomposed to be able to split up the work
    vec r_old;
+   vec result(n/static_cast<size_t>(nprocs));
    vec sub_a_times_p(n/static_cast<size_t>(nprocs));
    int max_iter = 100000;
 
@@ -185,9 +186,10 @@ vec conj_grad_solver(const mat &A, const vec &b)
 
 //      }
 
-      sub_x = vec_lin_combo(1.0, sub_x, alpha, sub_p );
-      sub_r = vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p);
-
+      vec_lin_combo(1.0, sub_x, alpha, sub_p, result);
+      sub_x = result;
+      vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p, result);
+      sub_r = result;
       // Convergence test
 
       if (mpi_vector_norm(sub_r) < tolerance) { // vector norm needs to use a all reduce!
@@ -198,7 +200,8 @@ vec conj_grad_solver(const mat &A, const vec &b)
       
       double beta = mpi_dot_product(sub_r, sub_r)/std::max(mpi_dot_product(r_old, r_old), tolerance);
 
-      sub_p = vec_lin_combo(1.0, sub_r, beta, sub_p);             // Next gradient
+      vec_lin_combo(1.0, sub_r, beta, sub_p, result);             // Next gradient
+      sub_p = result;
 
       // WE NEED TO UPDATE THE p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
       MPI_Allgatherv(&sub_p.front(), row_cnt[rank], MPI_DOUBLE, &p.front(), row_cnt, row_disp, MPI_DOUBLE, MPI_COMM_WORLD);
