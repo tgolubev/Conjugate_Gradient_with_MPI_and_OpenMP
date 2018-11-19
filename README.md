@@ -1,5 +1,5 @@
-# Parallel Conjugate Gradient algorithm with CUDA (GPU) plus MPI
+# Parallel Conjugate Gradient algorithm with MPI plus OpenMP
 
-Implementing a parallelized conjugate gradient algorithm using a hybrid of distributed (MPI) and shared (CUDA) memory approach.
+Implementing a parallelized conjugate gradient algorithm using a hybrid of distributed (MPI) and shared (OpenMP) memory approach.
 
 
