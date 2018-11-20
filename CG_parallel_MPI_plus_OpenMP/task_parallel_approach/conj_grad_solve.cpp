@@ -17,7 +17,7 @@ void mat_times_vec(const std::vector<vec> &sub_A, const vec &v, vec &result)
    size_t sub_size = sub_A.size();
 
 
-#pragma omp parallel for nowait // this is dividing the work among the rows...
+#pragma omp parallel for // this is dividing the work among the rows...
    for (size_t i = 0; i < sub_size; i++) // loop over the rows of the sub matrix
        result[i] = dot_product(sub_A[i], v);  // dot product of ith row of sub_A with the vector v
 
@@ -155,57 +155,75 @@ vec conj_grad_solver(const mat &A, const vec &b)
        // note: make sure matrix is big enough for thenumber of processors you are using!
 
       r_old = sub_r;                                         // Store previous residual
-      
+
       mat_times_vec(sub_A, p, sub_a_times_p);  //split up with MPI and then finer parallelize with openmp
 
-#pragma omp parallel
-#pragma omp single
-{
+      double sub_sub_r_sqrd, sub_sub_p_by_ap;
 
+ // maybe it will work with threads too--> JUST MAKE SURE THE MPI reduces are OUTSIDE OF THEM!!!
+  // so need to instad of using the funcitons, just put the code here explicitely!!
+#pragma omp parallel sections
+//#pragma omp single // single works, but when add tasks, things fail. // single says to do only each task once
+{
+        #pragma omp section
+        {
+            sub_sub_r_sqrd = std::inner_product(sub_r.begin(), sub_r.end(), sub_r.begin(), 0.0);
+        }
+        #pragma omp section
+        {
+            sub_sub_p_by_ap = std::inner_product(sub_p.begin(), sub_p.end(), sub_a_times_p.begin(), 0.0);
+        }
+
+}
+      // mpi reduce maybe can't be inside the threads!!..., b/c a single thread doesn't have memory access to all the different procs!!!!!!
+      MPI_Allreduce(&sub_sub_r_sqrd, &sub_r_sqrd, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      MPI_Allreduce(&sub_sub_p_by_ap, &sub_p_by_ap, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
       // mpi_dot_product will perform a reduction over the sub vectors to give back the full vector!
 
-      #pragma omp task
-          sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
+      //#pragma omp section //task default(shared) depend(out: sub_r_sqrd)  // need to specify the variables to be shared!
+       //  sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
 
-      #pragma omp task
-          sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
+      //std::cout << "test" << sub_r_sqrd <<  std::endl;  // SEEMS LIKE GETTING STACK OVERFLOW--> RUNS FOR A WHILE PRINTING A LOT, THEN FAILS...., SO NOT IMMEIDATE FAIL
 
-      #pragma omp taskwait // this is a barrier, since need to have both above tasks done before next step
+      //#pragma omp section //task shared(sub_p_by_ap)
+       //   sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
+
+     //#pragma omp taskwait // this is a barrier, since need to have both above tasks done before next step
+//}
 
       double alpha = sub_r_sqrd/std::max(sub_p_by_ap, tolerance);
 
       // Next estimate of solution
 
-      #pragma omp task
-      {
+      //#pragma omp task
+      //{
         vec_lin_combo(1.0, sub_x, alpha, sub_p, result);
         sub_x = result;
-      }
-      #pragma omp task depend(out:sub_r)
-      {
+      //}
+      //#pragma omp task depend(out:sub_r)
+      //{
           vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p, result);
           sub_r = result;
-      }
-      #pragma omp task depend(in: sub_r, out:norm_sub_r)
-        norm_sub_r = mpi_vector_norm(sub_r);
-      #pragma omp task depend(in: norm_sub_r)
-      {
-          // Convergence test
-          if (norm_sub_r < tolerance) { // vector norm needs to use a all reduce!
-              std:: cout << "Converged at iter = " << i << std::endl;
-              break;
-          }
-       }
+      //}
+      //#pragma omp task depend(in: sub_r) depend(out: sub_r_sqrd)
+        sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
 
-      #pragma omp taskwait
 
-      double beta = mpi_dot_product(sub_r, sub_r)/std::max(mpi_dot_product(r_old, r_old), tolerance);
+
+// recall that we can't have a 'break' within an openmp parallel region, so end it here then all threads are merged, and the convergence is checked
+
+      // Convergence test
+        if (sqrt(sub_r_sqrd) < tolerance) { // norm is just sqrt(dot product so don't need to use a separate norm fnc) // vector norm needs to use a all reduce!
+             std:: cout << "Converged at iter = " << i << std::endl;
+             break;
+         }
+
+
+      double beta = sub_r_sqrd/std::max(mpi_dot_product(r_old, r_old), tolerance);
 
       vec_lin_combo(1.0, sub_r, beta, sub_p, result);             // Next gradient
       sub_p = result;
 
-
-}
 
 
       // WE NEED TO UPDATE THE p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
