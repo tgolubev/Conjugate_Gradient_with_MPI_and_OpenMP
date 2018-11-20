@@ -1,6 +1,8 @@
 # Instructions to run on HPCC at MSU
 
-    module load OpenMPI
+    
+    module load GNU/7.3.0-2.30
+    module load OpenMPI/3.1.1
     alias devjob='salloc -n 4 --time 1:30:00'  // request an interactive job. This is important! Otherwise it will not always get the threads you ask for and have 
                                                 //unreliable timings
     make

@@ -160,36 +160,42 @@ vec conj_grad_solver(const mat &A, const vec &b)
 
       double sub_sub_r_sqrd, sub_sub_p_by_ap;
 
- // maybe it will work with threads too--> JUST MAKE SURE THE MPI reduces are OUTSIDE OF THEM!!!
-  // so need to instad of using the funcitons, just put the code here explicitely!!
-#pragma omp parallel sections
-//#pragma omp single // single works, but when add tasks, things fail. // single says to do only each task once
+
+// using tasks is better than sections b/c tasks will allow for a thread to omove on to a new task when finished with current one
+
+#pragma omp parallel
+#pragma omp single // single works, but when add tasks, things fail. // single says to do only each task once
 {
-        #pragma omp section
+        #pragma omp task
         {
             sub_sub_r_sqrd = std::inner_product(sub_r.begin(), sub_r.end(), sub_r.begin(), 0.0);
         }
-        #pragma omp section
+        #pragma omp task
         {
             sub_sub_p_by_ap = std::inner_product(sub_p.begin(), sub_p.end(), sub_a_times_p.begin(), 0.0);
         }
 
+        #pragma omp taskwait
+
+        // THIS WORKS!! --> just the Allreduce can't be inside the tasks!!, needs to be done after a synchornization, taskwait!!
+          //i.e. the tasks need to complete before do the reduce!!
+
+        // mpi reduce maybe can't be inside the threads!!..., b/c a single thread doesn't have memory access to all the different procs!!!!!!
+        // mpi_dot_product will perform a reduction over the sub vectors to give back the full vector!
+        MPI_Allreduce(&sub_sub_r_sqrd, &sub_r_sqrd, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        MPI_Allreduce(&sub_sub_p_by_ap, &sub_p_by_ap, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+        #pragma omp task default(shared) depend(out: sub_r_sqrd)  // need to specify the variables to be shared!
+           sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
+
+        #pragma omp task default(shared)
+            sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
+
+        #pragma omp taskwait // this is a barrier, since need to have both above tasks done before next step
+
 }
-      // mpi reduce maybe can't be inside the threads!!..., b/c a single thread doesn't have memory access to all the different procs!!!!!!
-      MPI_Allreduce(&sub_sub_r_sqrd, &sub_r_sqrd, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-      MPI_Allreduce(&sub_sub_p_by_ap, &sub_p_by_ap, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-      // mpi_dot_product will perform a reduction over the sub vectors to give back the full vector!
 
-      //#pragma omp section //task default(shared) depend(out: sub_r_sqrd)  // need to specify the variables to be shared!
-       //  sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
 
-      //std::cout << "test" << sub_r_sqrd <<  std::endl;  // SEEMS LIKE GETTING STACK OVERFLOW--> RUNS FOR A WHILE PRINTING A LOT, THEN FAILS...., SO NOT IMMEIDATE FAIL
-
-      //#pragma omp section //task shared(sub_p_by_ap)
-       //   sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
-
-     //#pragma omp taskwait // this is a barrier, since need to have both above tasks done before next step
-//}
 
       double alpha = sub_r_sqrd/std::max(sub_p_by_ap, tolerance);
 
