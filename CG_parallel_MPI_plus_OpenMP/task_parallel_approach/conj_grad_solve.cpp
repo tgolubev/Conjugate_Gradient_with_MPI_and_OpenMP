@@ -185,10 +185,13 @@ vec conj_grad_solver(const mat &A, const vec &b)
         MPI_Allreduce(&sub_sub_r_sqrd, &sub_r_sqrd, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         MPI_Allreduce(&sub_sub_p_by_ap, &sub_p_by_ap, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-        #pragma omp task default(shared) depend(in: sub_p_by_ap, sub_r_sqrd)
+        #pragma omp task default(shared)
             alpha = sub_r_sqrd/std::max(sub_p_by_ap, tolerance);
 
-        #pragma omp taskwait
+/*
+//#pragma omp taskwait  // seems I need this taskwait for it to give proper result
+#pragma omp taskwait
+
 
          // Next estimate of solution
          #pragma omp task default(shared) depend(in: alpha)
@@ -201,12 +204,27 @@ vec conj_grad_solver(const mat &A, const vec &b)
              vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p, result);
              sub_r = result;
          }
+
          #pragma omp task default(shared) depend(in: sub_r) depend(out: sub_r_sqrd)
             sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
 
          #pragma omp taskwait // this is a barrier, since need to have both above tasks done before next step
 
+         #pragma omp taskwait
+
+            */
+
 }
+
+      // THESE SEEM BETTER WHEN NOT INSIDE AN OMP PARALLEL REGION--> WORKS MUCH FASTER!!
+
+      vec_lin_combo(1.0, sub_x, alpha, sub_p, result);
+      sub_x = result;
+
+      vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p, result);
+      sub_r = result;
+
+      sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
 
 
 // recall that we can't have a 'break' within an openmp parallel region, so end it here then all threads are merged, and the convergence is checked
