@@ -8,18 +8,24 @@ b(6) = 1;
 %n1 = 20; % size of square matrix
 %A = gallery('moler',n1);  %dense matrix
 %b = sum(A,2);
-
-tic
-
-x = pcg(A, b, 1e-6, 10000);
-
-toc
+% 
+% tic
+% 
+% x = pcg(A, b, 1e-6, 10000);
+% 
+% toc
 
 % cholesky factorization
 % A_factorized = ichol(A)
 
 A_dense = full(A);
 % A_factorized_dense = full(A_factorized);
+
+tic
+
+x = pcg(A_dense, b, 1e-6, 10000);
+
+toc
 
 
 % save to file
