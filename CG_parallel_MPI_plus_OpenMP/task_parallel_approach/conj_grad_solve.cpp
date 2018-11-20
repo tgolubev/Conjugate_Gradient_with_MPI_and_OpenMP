@@ -158,7 +158,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
 
       mat_times_vec(sub_A, p, sub_a_times_p);  //split up with MPI and then finer parallelize with openmp
 
-      double sub_sub_r_sqrd, sub_sub_p_by_ap;
+      double sub_sub_r_sqrd, sub_sub_p_by_ap, alpha;
 
 
 // using tasks is better than sections b/c tasks will allow for a thread to omove on to a new task when finished with current one
@@ -185,35 +185,28 @@ vec conj_grad_solver(const mat &A, const vec &b)
         MPI_Allreduce(&sub_sub_r_sqrd, &sub_r_sqrd, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         MPI_Allreduce(&sub_sub_p_by_ap, &sub_p_by_ap, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-        #pragma omp task default(shared) depend(out: sub_r_sqrd)  // need to specify the variables to be shared!
-           sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
+        #pragma omp task default(shared) depend(in: sub_p_by_ap, sub_r_sqrd)
+            alpha = sub_r_sqrd/std::max(sub_p_by_ap, tolerance);
 
-        #pragma omp task default(shared)
-            sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
+        #pragma omp taskwait
 
-        #pragma omp taskwait // this is a barrier, since need to have both above tasks done before next step
+         // Next estimate of solution
+         #pragma omp task default(shared) depend(in: alpha)
+         {
+            vec_lin_combo(1.0, sub_x, alpha, sub_p, result);
+            sub_x = result;
+         }
+         #pragma omp task default(shared) depend(in: alpha) depend(out:sub_r)
+         {
+             vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p, result);
+             sub_r = result;
+         }
+         #pragma omp task default(shared) depend(in: sub_r) depend(out: sub_r_sqrd)
+            sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
+
+         #pragma omp taskwait // this is a barrier, since need to have both above tasks done before next step
 
 }
-
-
-
-      double alpha = sub_r_sqrd/std::max(sub_p_by_ap, tolerance);
-
-      // Next estimate of solution
-
-      //#pragma omp task
-      //{
-        vec_lin_combo(1.0, sub_x, alpha, sub_p, result);
-        sub_x = result;
-      //}
-      //#pragma omp task depend(out:sub_r)
-      //{
-          vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p, result);
-          sub_r = result;
-      //}
-      //#pragma omp task depend(in: sub_r) depend(out: sub_r_sqrd)
-        sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
-
 
 
 // recall that we can't have a 'break' within an openmp parallel region, so end it here then all threads are merged, and the convergence is checked
