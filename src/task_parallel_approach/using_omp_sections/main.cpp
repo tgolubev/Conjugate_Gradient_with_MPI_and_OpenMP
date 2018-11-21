@@ -20,8 +20,9 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 
 
 int main(int argc, char **argv)
-{   
+{
     int n =  324;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
+    double error_tol = 1e-4;
     std::string matrix_filename = "matrix.txt";
     std::string rhs_filename = "rhs.txt";
 
@@ -52,12 +53,12 @@ int main(int argc, char **argv)
 
         //std::cout << "Matrix A: " << std::endl;
         //print(A);
-        
+
         //std::cout << "rhs b: " << std::endl;
         // print(b);
-        
-        std::cout << "solution x: " << std::endl;
-        print(x);
+
+        //std::cout << "solution x: " << std::endl;
+        //print(x);
 
         vec A_times_x(x.size());
         //std::cout << "Check A*x = b " << std::endl;
@@ -70,7 +71,9 @@ int main(int argc, char **argv)
         for (size_t i = 0; i < x.size(); i++) {
             error[i] = abs(A_times_x[i] - b[i]);
         }
-        print(error);
+        if (*std::max_element(error.begin(), error.end()) > error_tol)
+            std::cout << "Error in solution is larger than " << error_tol << std::endl;
+        //print(error);
 
         std::cout << " CPU time = " << time.count() << std::endl;
 
@@ -78,11 +81,5 @@ int main(int argc, char **argv)
 
     // use hdf5 to store the x solution and the error...
 
-
     MPI_Finalize();
 }
-
-
-
-
-

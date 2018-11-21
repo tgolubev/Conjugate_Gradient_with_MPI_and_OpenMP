@@ -113,7 +113,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
         for (size_t j = 0; j < A[0].size(); j++)
             sub_A[i][j] = A[static_cast<size_t>(rank) * m/static_cast<size_t>(nprocs) + i][j];
 
-    double tolerance = 1.0e-5;
+    double tolerance = 1.0e-4;
 
     size_t n = A.size();
     vec sub_x(n/static_cast<size_t>(nprocs)); // iniitalize a vector to store the solution subvector
