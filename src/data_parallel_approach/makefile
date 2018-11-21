@@ -9,13 +9,14 @@ all: cg
 
 # Whereas here we create the object file
 cg: $(OBJS)  
+	#mpic++ ${FLAGS} -o cg $(OBJS) 
 	h5c++ ${FLAGS} -o cg $(OBJS) # note: must use mpic++ compiler for MPI with cpp files (mpicc for .c)
 	export OMP_NUM_THREADS=4  # use this for OpenMP
 #	./md
 
 %.o: %.cpp 
 	h5c++ $(FLAGS) -c $<
-
+	#mpic++ $(FLAGS) -c $<
 
 
 # Clean

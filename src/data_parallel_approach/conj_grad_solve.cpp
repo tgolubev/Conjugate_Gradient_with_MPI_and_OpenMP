@@ -31,7 +31,6 @@ void vec_lin_combo(double a, const vec &u, double b, const vec &v, vec &result)
     // overhead of creating threads is larger than operation
     for (size_t j = 0; j < n; j++)
         result[j] = a * u[j] + b * v[j];
-
 }
 
 
@@ -85,7 +84,7 @@ double mpi_vector_norm(const vec &sub_v)
 }
 
 
-vec conj_grad_solver(const mat &A, const vec &b)
+vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
 {
 
     // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
@@ -115,21 +114,23 @@ vec conj_grad_solver(const mat &A, const vec &b)
 
     double tolerance = 1.0e-4;
 
-    size_t n = A.size();
-    vec sub_x(n/static_cast<size_t>(nprocs)); // iniitalize a vector to store the solution subvector
-    vec x(n);
-    // we want a decomposed r
+    vec sub_x(m/static_cast<size_t>(nprocs)); // this is for the initial guess
 
+    // we want a decomposed r and initial guess
     vec sub_r(m/static_cast<size_t>(nprocs));
-    for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++)
+    for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++) {
         sub_r[i] = b[(m/static_cast<size_t>(nprocs))*static_cast<size_t>(rank) + i];
+        sub_x[i] = initial_guess[(m/static_cast<size_t>(nprocs))*static_cast<size_t>(rank) + i];
+    }
 
     //---------------------------------------------------------------------------------------------------------
+
+    vec x(m);  // iniitalize a vector to store the solution subvector
     vec p = b;  //we want a full p
     vec sub_p = sub_r; //also we want a sub_p, decomposed to be able to split up the work
     vec r_old;
-    vec result1(n/static_cast<size_t>(nprocs)), result2(n/static_cast<size_t>(nprocs)), result3(n/static_cast<size_t>(nprocs));
-    vec sub_a_times_p(n/static_cast<size_t>(nprocs));
+    vec result1(m/static_cast<size_t>(nprocs)), result2(m/static_cast<size_t>(nprocs)), result3(m/static_cast<size_t>(nprocs)); // buffers
+    vec sub_a_times_p(m/static_cast<size_t>(nprocs));
     int max_iter = 100000;
 
     double sub_r_sqrd, sub_p_by_ap, norm_sub_r, sub_sub_r_sqrd, sub_sub_p_by_ap, alpha, sub_r_sqrd_old, beta;
@@ -147,7 +148,7 @@ vec conj_grad_solver(const mat &A, const vec &b)
 
         sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
 
-        alpha = sub_r_sqrd/std::max(sub_p_by_ap, tolerance);
+        alpha = sub_r_sqrd/sub_p_by_ap;          //std::max(sub_p_by_ap, tolerance);
 
         // Next estimate of solution
         vec_lin_combo(1.0, sub_x, alpha, sub_p, result1);
