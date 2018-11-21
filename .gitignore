@@ -41,3 +41,5 @@
 *.Release
 *.ilk
 *.user
+*.pro
+*.pro.user
