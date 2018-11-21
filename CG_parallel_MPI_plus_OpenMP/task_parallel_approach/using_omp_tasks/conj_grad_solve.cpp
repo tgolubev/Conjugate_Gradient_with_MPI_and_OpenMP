@@ -165,14 +165,16 @@ vec conj_grad_solver(const mat &A, const vec &b)
 
 #pragma omp parallel
 #pragma omp single // single works, but when add tasks, things fail. // single says to do only each task once
-{
-        #pragma omp task
+{  
+
+          // THIS SUB r squared calculation is only needed in 1st iteration it seems!!, maybe can add an if statement??
+#pragma omp task
         {
-            sub_sub_r_sqrd = std::inner_product(sub_r.begin(), sub_r.end(), sub_r.begin(), 0.0);
+            sub_sub_r_sqrd = __gnu_parallel::inner_product(sub_r.begin(), sub_r.end(), sub_r.begin(), 0.0);// can use gnu parallel here, it works but not sure if gives any speedup.
         }
         #pragma omp task
         {
-            sub_sub_p_by_ap = std::inner_product(sub_p.begin(), sub_p.end(), sub_a_times_p.begin(), 0.0);
+            sub_sub_p_by_ap = __gnu_parallel::inner_product(sub_p.begin(), sub_p.end(), sub_a_times_p.begin(), 0.0);
         }
 
         #pragma omp taskwait
@@ -185,34 +187,28 @@ vec conj_grad_solver(const mat &A, const vec &b)
         MPI_Allreduce(&sub_sub_r_sqrd, &sub_r_sqrd, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         MPI_Allreduce(&sub_sub_p_by_ap, &sub_p_by_ap, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-        #pragma omp task default(shared)
-            alpha = sub_r_sqrd/std::max(sub_p_by_ap, tolerance);
+        alpha = sub_r_sqrd/std::max(sub_p_by_ap, tolerance);
 
+
+//#pragma omp taskwait  // I need this taskwait for it to give proper result. b/c the reduce needs to complete...
 /*
-//#pragma omp taskwait  // seems I need this taskwait for it to give proper result
 #pragma omp taskwait
 
 
          // Next estimate of solution
-         #pragma omp task default(shared) depend(in: alpha)
+         #pragma omp task
          {
             vec_lin_combo(1.0, sub_x, alpha, sub_p, result);
             sub_x = result;
          }
-         #pragma omp task default(shared) depend(in: alpha) depend(out:sub_r)
+         #pragma omp task
          {
              vec_lin_combo(1.0, sub_r, -alpha, sub_a_times_p, result);
              sub_r = result;
          }
 
-         #pragma omp task default(shared) depend(in: sub_r) depend(out: sub_r_sqrd)
-            sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
-
          #pragma omp taskwait // this is a barrier, since need to have both above tasks done before next step
-
-         #pragma omp taskwait
-
-            */
+         */
 
 }
 
