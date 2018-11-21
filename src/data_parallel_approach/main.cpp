@@ -60,12 +60,12 @@ int main(int argc, char **argv)
         // print(b);
 
         //std::cout << "solution x: " << std::endl;
-        //print(x);
+        print(x);
 
         vec A_times_x(x.size());
         //std::cout << "Check A*x = b " << std::endl;
         mat_times_vec(A, x, A_times_x);
-        //print(A_times_x);
+        print(A_times_x);
 
         //------------------------- Verification Test ----------------------------------------------------------------------
         // we will compare the A*x result to the right hand side

@@ -1,6 +1,6 @@
 % generation of a dense matrix which can be solved with conjugate gradient
 
-N = 50;
+N = 20;
 A = delsq(numgrid('S',N)); %sparse matrix
 b = zeros(size(A,1),1);
 b(6) = 1;
@@ -25,7 +25,7 @@ A_dense = full(A);
 
 tic
 
-x = pcg(A_dense, b, 1e-6, 10000);
+x = pcg(A_dense, b, 1e-8, 10000);
 
 toc
 

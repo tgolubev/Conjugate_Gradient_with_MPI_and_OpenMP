@@ -29,6 +29,7 @@
 *.app
 
 #data output
+*.txt
 
 # excel
 *.xlsx

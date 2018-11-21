@@ -27,7 +27,7 @@ void vec_lin_combo(double a, const vec &u, double b, const vec &v, vec &result)
 {
     size_t n = u.size();
 
-    //#pragma omp parallel for  //NOTE: IT IS FASTER WITHOUT THIS PRAGMA!!--> THE OPERATION ISN'T cpu intensive enough so
+    //#pragma omp parallel for  //NOTE: IT seems FASTER WITHOUT THIS PRAGMA!!, at least for smaller matrices
     // overhead of creating threads is larger than operation
     for (size_t j = 0; j < n; j++)
         result[j] = a * u[j] + b * v[j];
@@ -112,7 +112,7 @@ vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
         for (size_t j = 0; j < A[0].size(); j++)
             sub_A[i][j] = A[static_cast<size_t>(rank) * m/static_cast<size_t>(nprocs) + i][j];
 
-    double tolerance = 1.0e-4;
+    double tolerance = 1.0e-8;  //1e-8 seems to be a reasonable tolerance
 
     vec sub_x(m/static_cast<size_t>(nprocs)); // this is for the initial guess
 
@@ -148,7 +148,7 @@ vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
 
         sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
 
-        alpha = sub_r_sqrd/sub_p_by_ap;          //std::max(sub_p_by_ap, tolerance);
+        alpha = sub_r_sqrd/sub_p_by_ap;         
 
         // Next estimate of solution
         vec_lin_combo(1.0, sub_x, alpha, sub_p, result1);
@@ -166,8 +166,8 @@ vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
             break;
         }
 
-        beta = sub_r_sqrd/std::max(mpi_dot_product(r_old, r_old), tolerance);
-
+        beta = sub_r_sqrd/sub_r_sqrd_old;       
+        
         vec_lin_combo(1.0, sub_r, beta, sub_p, result3);             // Next gradient
         sub_p = result3;
 
