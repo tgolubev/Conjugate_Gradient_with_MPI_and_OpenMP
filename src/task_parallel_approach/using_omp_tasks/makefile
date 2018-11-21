@@ -3,7 +3,7 @@
 FLAGS = -O3 -Wall -fopenmp
 
 # Here we make the executable file
-SRCS =   main.cpp IO.cpp conj_grad_solve.cpp
+SRCS =   main.cpp IO.cpp conj_grad_solve.cpp 
 OBJS = $(subst .cpp,.o,$(SRCS))
 all: cg
 

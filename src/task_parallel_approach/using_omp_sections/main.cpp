@@ -25,6 +25,7 @@ int main(int argc, char **argv)
     double error_tol = 1e-4;
     std::string matrix_filename = "matrix.txt";
     std::string rhs_filename = "rhs.txt";
+    std::string initial_guess_filename = "initial_guess.txt";
 
     MPI_Init (&argc, &argv);
     int nprocs, rank;
@@ -33,6 +34,7 @@ int main(int argc, char **argv)
 
     mat A = read_matrix(n, matrix_filename);  // here is spot where can use hdf5 in the future for i/o
     vec b = read_vector(n, rhs_filename);
+    const vec initial_guess = read_vector(n, initial_guess_filename);
 
     // NOTE: CONJUGATE GRAD WORKS MUCH NICER WITH SPARSE MATRICES, THAN DENSE ONES!!
 
@@ -44,7 +46,7 @@ int main(int argc, char **argv)
 
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-    vec x = conj_grad_solver(A, b);  // domain decomposition is done inside the solver
+    vec x = conj_grad_solver(A, b, initial_guess);  // domain decomposition is done inside the solver
 
     std::chrono::high_resolution_clock::time_point finish = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> time = std::chrono::duration_cast<std::chrono::duration<double>>(finish-start);

@@ -148,7 +148,7 @@ vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
 
        sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
 
-       alpha = sub_r_sqrd/std::max(sub_p_by_ap, tolerance);
+       alpha = sub_r_sqrd/sub_p_by_ap;
 
 // note: overhead for these sections is too much. It is faster without sections.
 #pragma omp parallel sections
@@ -175,7 +175,7 @@ vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
            break;
        }
 
-       beta = sub_r_sqrd/std::max(sub_r_sqrd_old, tolerance);
+       beta = sub_r_sqrd/sub_r_sqrd_old;
 
        vec_lin_combo(1.0, sub_r, beta, sub_p, result3);             // Next gradient
        sub_p = result3;
