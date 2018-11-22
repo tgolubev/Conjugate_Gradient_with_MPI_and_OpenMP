@@ -3,19 +3,20 @@
 FLAGS = -O3 -Wall -fopenmp
 
 # Here we make the executable file
-SRCS =   main.cpp IO.cpp conj_grad_solve.cpp 
+SRCS =   main.cpp IO.cpp conj_grad_solve.cpp
 OBJS = $(subst .cpp,.o,$(SRCS))
 all: cg
 
 # Whereas here we create the object file
 cg: $(OBJS)  
-	mpic++ ${FLAGS} -o cg $(OBJS) # note: must use mpic++ compiler for MPI with cpp files (mpicc for .c)
-	export OMP_NUM_THREADS=1  # use this for OpenMP
+	#mpic++ ${FLAGS} -o cg $(OBJS) 
+	h5c++ ${FLAGS} -o cg $(OBJS) # note: must use mpic++ compiler for MPI with cpp files (mpicc for .c)
+	export OMP_NUM_THREADS=4  # use this for OpenMP
 #	./md
 
 %.o: %.cpp 
-	mpic++ $(FLAGS) -c $<
-
+	h5c++ $(FLAGS) -c $<
+	#mpic++ $(FLAGS) -c $<
 
 
 # Clean

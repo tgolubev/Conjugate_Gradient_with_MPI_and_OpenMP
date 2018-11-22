@@ -49,12 +49,13 @@ double mpi_dot_product(const vec &sub_u, const vec &sub_v) // need to pass it th
    double product;
    size_t length = sub_u.size();
 
-   // using the omp reduction is about same speed as using __gnu_parallel
+   // trying to parallelize this made it slower (with 10 threads, 2 procs, than w/o the parallelization!)
+   // THAT MIGHT BE B/C THE INNER PRODUCT is a very efficient implementation!! which is hard to beat.
    //double sub_prod = 0.0;
    //#pragma omp parallel for reduction(+:sub_prod)
 //   for (size_t i = 0; i < length; i++) {
-       sub_prod += sub_u[i] * sub_v[i];
-   }
+//       sub_prod += sub_u[i] * sub_v[i];
+//   }
    double sub_prod = __gnu_parallel::inner_product(sub_u.begin(), sub_u.end(), sub_v.begin(), 0.0); // last argument is initial value of the sum of products
    // using gnu_parallel instead of regular inner_product didin't really speed things up but didint' slow them down either.
    
@@ -82,7 +83,7 @@ double mpi_vector_norm(const vec &sub_v)
 }
 
 
-vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
+vec conj_grad_solver(const mat &A, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)
 {
     
    // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
@@ -110,8 +111,6 @@ vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
    for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++)
        for (size_t j = 0; j < A[0].size(); j++)
          sub_A[i][j] = A[static_cast<size_t>(rank) * m/static_cast<size_t>(nprocs) + i][j];
-
-   double tolerance = 1.0e-8;
 
    vec sub_x(m/static_cast<size_t>(nprocs)); // iniitalize a vector to store the solution subvector
 
@@ -149,7 +148,8 @@ vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
 
        alpha = sub_r_sqrd/sub_p_by_ap;
 
-        #pragma omp parallel
+// note: overhead for these sections is too much. It is faster without sections.
+#pragma omp parallel
         #pragma omp single
         {
 
@@ -168,13 +168,13 @@ vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
                     #pragma omp taskwait // this is a barrier, since need to have both above tasks done before next step
         }
 
-
        sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
 
        // recall that we can't have a 'break' within an openmp parallel region, so end it here then all threads are merged, and the convergence is checked
        // Convergence test
        if (sqrt(sub_r_sqrd) < tolerance) { // norm is just sqrt(dot product so don't need to use a separate norm fnc) // vector norm needs to use a all reduce!
            std:: cout << "Converged at iter = " << i << std::endl;
+           total_iters = i;
            break;
        }
 
