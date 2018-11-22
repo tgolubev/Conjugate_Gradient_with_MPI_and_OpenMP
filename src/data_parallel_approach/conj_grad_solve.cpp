@@ -84,7 +84,7 @@ double mpi_vector_norm(const vec &sub_v)
 }
 
 
-vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
+vec conj_grad_solver(const mat &A, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
 {
 
     // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
@@ -111,8 +111,6 @@ vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
     for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++)
         for (size_t j = 0; j < A[0].size(); j++)
             sub_A[i][j] = A[static_cast<size_t>(rank) * m/static_cast<size_t>(nprocs) + i][j];
-
-    double tolerance = 1.0e-8;  //1e-8 seems to be a reasonable tolerance
 
     vec sub_x(m/static_cast<size_t>(nprocs)); // this is for the initial guess
 
@@ -163,6 +161,7 @@ vec conj_grad_solver(const mat &A, const vec &b, const vec &initial_guess)
         // Convergence test
         if (sqrt(sub_r_sqrd) < tolerance) { // norm is just sqrt(dot product so don't need to use a separate norm fnc) // vector norm needs to use a all reduce!
             std:: cout << "Converged at iter = " << i << std::endl;
+            total_iters = i;
             break;
         }
 

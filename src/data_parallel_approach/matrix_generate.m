@@ -21,7 +21,7 @@ b(6) = 1;
 A_dense = full(A);
 % A_factorized_dense = full(A_factorized);
 
-%initial_guess = zeros(324, 1);
+initial_guess = zeros(size(A,1), 1);
 
 tic
 
@@ -31,8 +31,17 @@ toc
 
 % save to HDF5 file
 h5create('cg.h5','/matrix',size(A_dense));
-h5write('cg.h5', '/matrix', A_dense);
+h5create('cg.h5','/solution',size(x)); % prepare data set for solution
+h5create('cg.h5','/initial_guess',size(x));
+h5create('cg.h5','/rhs',size(x));
+h5create('cg.h5','/cpu_time',1);  % spot to store the cpu time
+h5create('cg.h5','/num_iters',1); %store number of iters it took to solve
+h5create('cg.h5','/tolerance',1);
+h5create('cg.h5','/error',size(x));
 
+h5write('cg.h5', '/matrix', A_dense);
+h5write('cg.h5', '/initial_guess',initial_guess);
+h5write('cg.h5', '/rhs', b);
 
 % save to file: regular text file
 format long
