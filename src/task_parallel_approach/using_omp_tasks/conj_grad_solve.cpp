@@ -49,13 +49,12 @@ double mpi_dot_product(const vec &sub_u, const vec &sub_v) // need to pass it th
    double product;
    size_t length = sub_u.size();
 
-   // trying to parallelize this made it slower (with 10 threads, 2 procs, than w/o the parallelization!)
-   // THAT MIGHT BE B/C THE INNER PRODUCT is a very efficient implementation!! which is hard to beat.
+   // using the omp reduction is about same speed as using __gnu_parallel
    //double sub_prod = 0.0;
    //#pragma omp parallel for reduction(+:sub_prod)
 //   for (size_t i = 0; i < length; i++) {
-//       sub_prod += sub_u[i] * sub_v[i];
-//   }
+       sub_prod += sub_u[i] * sub_v[i];
+   }
    double sub_prod = __gnu_parallel::inner_product(sub_u.begin(), sub_u.end(), sub_v.begin(), 0.0); // last argument is initial value of the sum of products
    // using gnu_parallel instead of regular inner_product didin't really speed things up but didint' slow them down either.
    

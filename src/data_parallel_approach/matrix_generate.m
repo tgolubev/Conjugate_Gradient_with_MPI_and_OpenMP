@@ -29,8 +29,12 @@ x = pcg(A_dense, b, 1e-8, 10000);
 
 toc
 
+% save to HDF5 file
+h5create('cg.h5','/matrix',size(A_dense));
+h5write('cg.h5', '/matrix', A_dense);
 
-% save to file
+
+% save to file: regular text file
 format long
 save('matrix.txt', 'A_dense', '-ascii','-double');
 % save('matrix_factorized.txt', 'A_factorized_dense', '-ascii','-double');

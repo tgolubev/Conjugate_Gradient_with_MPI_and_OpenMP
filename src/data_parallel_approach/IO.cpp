@@ -7,59 +7,34 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 void write_solution_hdf5(const vec &solution, const int n)
 {
 
-    hid_t       file_id;   /* file identifier */
+    hid_t       file_id, dataset_id;   // identifiers
     herr_t      status;
     double dset_data[n];
 
-    /* Create a new file using default properties. */
-    file_id = H5Fcreate("results.h5", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-
-    // Create a dataspace
-    hsize_t dims[0];
-    dims[0] = n;
-    hid_t dataspace_id = H5Screate_simple(0, dims, NULL);  //(rank, size of each dimesnion of dataset, max dims)
-
-    /* Initialize the dataset. */
+    // Initialize the dataset.
     // copy the data into C-style array, from std::vector
-       for (int i = 0; i < n; i++)
-            dset_data[i] = solution[i];
+    for (int i = 0; i < n; i++)
+        dset_data[i] = solution[i];
 
-       // LETS FIRST CREATE THE HDF5 FILE WITH DATASET IN MATLAB, then I will just open the existing fiel and dataset with this function and write to it!
 
-   /*
-    // In future, I WILL CREATE THE HDF5 FILE in Matlab when I generate the matrix to be solved...,
+    // I WILL CREATE THE HDF5 FILE in Matlab when I generate the matrix to be solved...,
     // then will open it and add the solution to the dataset
     // Open an existing file.
-      file_id = H5Fopen(FILE, H5F_ACC_RDWR, H5P_DEFAULT);
+    file_id = H5Fopen("cg.h5", H5F_ACC_RDWR, H5P_DEFAULT);
 
-      // Open an existing dataset.
-      dataset_id = H5Dopen(file_id, "/dset");
-      */
+    // Open an existing dataset.
+    dataset_id = H5Dopen(file_id, "/matrix", H5P_DEFAULT);
 
+    // Write the dataset
+    status = H5Dwrite(dataset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dset_data);
 
-      /* Write the dataset. */
-      //status = H5Dwrite(dataset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dset_data);
-
-     /*
-      // read example
-      status = H5Dread(dataset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
-                       dset_data);
-                       */
+    // read example
+    //status = H5Dread(dataset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, dset_data);
 
 
-    /*
-    // now create a real dataset
-    hid_t dataset_id = H5Dcreate(file_id, "/dset", HSD_STD_I32BE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-
-    // write data to the file
-    status = H5Dwrite(dataset_id, HST_NATIVE_INT, HSS_ALL, HSS_ALL, HSP_DEFAULT, solution);
-
-    // close the dataset and dataspace
+    // close the dataset and file
     status = H5Dclose(dataset_id);
-    */
-    status = H5Sclose(dataspace_id);
     status = H5Fclose(file_id);
-
 
 
     /* EXAMPLE CODE IS HERE
