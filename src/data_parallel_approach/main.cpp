@@ -21,7 +21,7 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 
 int main(int argc, char **argv)
 {
-    int n =  576;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
+    int n =  3150;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
     double error_tol = 1e-4;
     double tolerance = 1e-8; // for cg solver
 
@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 //    std::string initial_guess_filename = "initial_guess.txt";
 
     // names inside hd5 files need to be of char format
-    const char *h5_filename = "cg.h5";
+    const char *h5_filename = "cg_3D_poisson_dense.h5";
     const char *mat_dataset_name = "matrix";
     const char *rhs_dataset_name = "rhs";
     const char *guess_dataset_name = "initial_guess";
@@ -42,17 +42,19 @@ int main(int argc, char **argv)
     MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 
-    const mat A = read_mat_hdf5(h5_filename, mat_dataset_name, n);  // here is spot where can use hdf5 in the future for i/o
+    const mat sub_A = read_sub_mat_hdf5(h5_filename, mat_dataset_name, n);  // here is spot where can use hdf5 in the future for i/o
+    const mat A = read_mat_hdf5(h5_filename, mat_dataset_name, n);
     const vec b = read_vec_hdf5(h5_filename, rhs_dataset_name, n);
     const vec initial_guess = read_vec_hdf5(h5_filename, guess_dataset_name, n);
     int total_iters;
     vec x;
 
+
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < num_solves; i++) {
 
-        x = conj_grad_solver(A, b, tolerance, initial_guess, total_iters);  // domain decomposition is done inside the solver
+        x = conj_grad_solver(sub_A, b, tolerance, initial_guess, total_iters);  // domain decomposition is done inside the solver
 
     }
 
@@ -93,7 +95,7 @@ int main(int argc, char **argv)
         std::cout << " CPU time per iter = " << cpu_time_per_iter << std::endl;
 
         //------------------------ Write results to HDF5 file------------------------
-        write_results_hdf5(x, error, n, cpu_time, cpu_time_per_iter, tolerance, total_iters);
+        write_results_hdf5(h5_filename, x, error, n, cpu_time, cpu_time_per_iter, tolerance, total_iters);
 
     }
 

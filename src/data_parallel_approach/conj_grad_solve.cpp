@@ -1,6 +1,8 @@
 #include "conj_grad_solve.hpp"
 #include "IO.hpp"
 #include <omp.h>
+#include <time.h>
+#include <chrono>
 
 using vec = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
@@ -84,7 +86,7 @@ double mpi_vector_norm(const vec &sub_v)
 }
 
 
-vec conj_grad_solver(const mat &A, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
+vec conj_grad_solver(const mat &sub_A, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
 {
 
     // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
@@ -105,12 +107,22 @@ vec conj_grad_solver(const mat &A, const vec &b, const double tolerance, const v
         row_disp[i] = i * m/nprocs;  // NOTE: this is assuming that rank 0 is also doing work. LATER I MIGHT MAKE rank 0 be a master and only doing initializations.
     }
 
-    mat sub_A(m/static_cast<size_t>(nprocs), std::vector<double> (A[0].size()));  // note: this is the correct way to initialize a vector of vectors.
-    // note: A[0].size() gives # of elements in 1st row = # of columns
-    // this is #rows/nprocs for the row #, and column # is same as in A
-    for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++)
-        for (size_t j = 0; j < A[0].size(); j++)
-            sub_A[i][j] = A[static_cast<size_t>(rank) * m/static_cast<size_t>(nprocs) + i][j];
+
+//    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+
+//    mat sub_A(m/static_cast<size_t>(nprocs), std::vector<double> (m));  // note: this is the correct way to initialize a vector of vectors.
+//    // note: A[0].size() gives # of elements in 1st row = # of columns
+//    // this is #rows/nprocs for the row #, and column # is same as in A
+//    for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++)
+//        for (size_t j = 0; j < m; j++)
+//            sub_A[i][j] = A[static_cast<size_t>(rank) * m/static_cast<size_t>(nprocs) + i][j];
+
+//    std::chrono::high_resolution_clock::time_point finish = std::chrono::high_resolution_clock::now();
+//    std::chrono::duration<double> time = std::chrono::duration_cast<std::chrono::duration<double>>(finish-start);
+
+//    double cpu_time = time.count();
+
+//    std::cout << "cpu time for dividing matrix " << cpu_time << std::endl;
 
     vec sub_x(m/static_cast<size_t>(nprocs)); // this is for the initial guess
 

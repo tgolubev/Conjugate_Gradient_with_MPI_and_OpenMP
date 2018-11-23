@@ -3,8 +3,12 @@
 using vec    = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
-mat read_mat_hdf5(const char *filename, const char *mat_dataset_name, const int n)
+mat read_sub_mat_hdf5(const char *filename, const char *mat_dataset_name, const int n)
 {
+
+    int nprocs, rank;
+    MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
+    MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 
     hid_t       file_id, dataset_id;   // identifiers
     herr_t      status;
@@ -14,7 +18,46 @@ mat read_mat_hdf5(const char *filename, const char *mat_dataset_name, const int 
     // I WILL CREATE THE HDF5 FILE in Matlab when I generate the matrix to be solved...,
     // then will open it and add the solution to the dataset
     // Open an existing file.
-    file_id = H5Fopen("cg.h5", H5F_ACC_RDWR, H5P_DEFAULT);
+    file_id = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+
+    //-----------------------------------------------------------------------------
+    // Open an existing dataset
+    dataset_id = H5Dopen(file_id, mat_dataset_name, H5P_DEFAULT);
+
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dset_data);
+
+    // fill the matrix
+//    for (int i = 0; i < n; i++)
+//        for (int j = 0; j < n; j++)
+//            matrix[i][j] = dset_data[i][j];
+
+    mat sub_A(n/static_cast<size_t>(nprocs), std::vector<double> (n));  // note: this is the correct way to initialize a vector of vectors.
+    for (size_t i = 0; i < n/static_cast<size_t>(nprocs); i++)
+        for (size_t j = 0; j < n; j++)
+            sub_A[i][j] = dset_data[static_cast<size_t>(rank) * n/static_cast<size_t>(nprocs) + i][j];
+
+
+    return sub_A;
+
+}
+
+// full matrix is needed for verification
+mat read_mat_hdf5(const char *filename, const char *mat_dataset_name, const int n)
+{
+
+    int nprocs, rank;
+    MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
+    MPI_Comm_rank (MPI_COMM_WORLD, &rank);
+
+    hid_t       file_id, dataset_id;   // identifiers
+    herr_t      status;
+    double dset_data[n][n];  // a buffer for reading in the matrix
+    mat matrix(n, std::vector<double>(n));
+
+    // I WILL CREATE THE HDF5 FILE in Matlab when I generate the matrix to be solved...,
+    // then will open it and add the solution to the dataset
+    // Open an existing file.
+    file_id = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
 
     //-----------------------------------------------------------------------------
     // Open an existing dataset
@@ -31,6 +74,8 @@ mat read_mat_hdf5(const char *filename, const char *mat_dataset_name, const int 
 
 }
 
+
+
 vec read_vec_hdf5(const char *filename, const char *vec_dataset_name, const int n)
 {
 
@@ -42,7 +87,7 @@ vec read_vec_hdf5(const char *filename, const char *vec_dataset_name, const int 
     // I WILL CREATE THE HDF5 FILE in Matlab when I generate the matrix to be solved...,
     // then will open it and add the solution to the dataset
     // Open an existing file.
-    file_id = H5Fopen("cg.h5", H5F_ACC_RDWR, H5P_DEFAULT);
+    file_id = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
 
     //-----------------------------------------------------------------------------
     // Open an existing dataset
@@ -61,7 +106,7 @@ vec read_vec_hdf5(const char *filename, const char *vec_dataset_name, const int 
 
 
 
-void write_results_hdf5(const vec &solution, const vec &error, const int n, const double cpu_time, const double cpu_time_per_iter, const double tolerance, const int total_iters)
+void write_results_hdf5(const char *filename, const vec &solution, const vec &error, const int n, const double cpu_time, const double cpu_time_per_iter, const double tolerance, const int total_iters)
 {
 
     hid_t       file_id, dataset_id;   // identifiers
@@ -71,7 +116,7 @@ void write_results_hdf5(const vec &solution, const vec &error, const int n, cons
     // I WILL CREATE THE HDF5 FILE in Matlab when I generate the matrix to be solved...,
     // then will open it and add the solution to the dataset
     // Open an existing file.
-    file_id = H5Fopen("cg.h5", H5F_ACC_RDWR, H5P_DEFAULT);
+    file_id = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
 
     //-----------------------------------------------------------------------------
     // Open an existing dataset.

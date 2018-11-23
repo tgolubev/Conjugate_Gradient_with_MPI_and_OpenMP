@@ -1,19 +1,18 @@
 % generation of a dense matrix which can be solved with conjugate gradient
 
-N = 26;
-A = delsq(numgrid('S',N)); %sparse matrix
-b = zeros(size(A,1),1);
-b(6) = 1;
+% N = 50;
+% A = delsq(numgrid('S',N)); %sparse matrix
+% b = rand(size(A,1),1);  % use random #'s btw 0 and 1 for rhs
 
-%n1 = 20; % size of square matrix
-%A = gallery('moler',n1);  %dense matrix
-%b = sum(A,2);
-% 
-% tic
-% 
-% x = pcg(A, b, 1e-6, 10000);
-% 
-% toc
+n1 = 3150; % size of square matrix
+A = gallery('moler',n1);  %dense matrix
+b = sum(A,2);
+
+tic
+
+x = pcg(A, b, 1e-8, 10000);
+
+toc
 
 % cholesky factorization
 % A_factorized = ichol(A)
