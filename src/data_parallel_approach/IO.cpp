@@ -3,8 +3,65 @@
 using vec    = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
+mat read_mat_hdf5(const char *filename, const char *mat_dataset_name, const int n)
+{
 
-void write_results_hdf5(const vec &solution, const vec &error, const int n, const double cpu_time, const double tolerance, const int total_iters)
+    hid_t       file_id, dataset_id;   // identifiers
+    herr_t      status;
+    double dset_data[n][n];  // a buffer for reading in the matrix
+    mat matrix(n, std::vector<double>(n));
+
+    // I WILL CREATE THE HDF5 FILE in Matlab when I generate the matrix to be solved...,
+    // then will open it and add the solution to the dataset
+    // Open an existing file.
+    file_id = H5Fopen("cg.h5", H5F_ACC_RDWR, H5P_DEFAULT);
+
+    //-----------------------------------------------------------------------------
+    // Open an existing dataset
+    dataset_id = H5Dopen(file_id, mat_dataset_name, H5P_DEFAULT);
+
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dset_data);
+
+    // fill the matrix
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            matrix[i][j] = dset_data[i][j];
+
+    return matrix;
+
+}
+
+vec read_vec_hdf5(const char *filename, const char *vec_dataset_name, const int n)
+{
+
+    hid_t       file_id, dataset_id;   // identifiers
+    herr_t      status;
+    double dset_data[n];  // a buffer for reading in the matrix
+    vec vector(n);
+
+    // I WILL CREATE THE HDF5 FILE in Matlab when I generate the matrix to be solved...,
+    // then will open it and add the solution to the dataset
+    // Open an existing file.
+    file_id = H5Fopen("cg.h5", H5F_ACC_RDWR, H5P_DEFAULT);
+
+    //-----------------------------------------------------------------------------
+    // Open an existing dataset
+    dataset_id = H5Dopen(file_id, vec_dataset_name, H5P_DEFAULT);
+
+    status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dset_data);
+
+    // fill the matrix
+    for (int i = 0; i < n; i++) {
+            vector[i] = dset_data[i];
+    }
+
+    return vector;
+}
+
+
+
+
+void write_results_hdf5(const vec &solution, const vec &error, const int n, const double cpu_time, const double cpu_time_per_iter, const double tolerance, const int total_iters)
 {
 
     hid_t       file_id, dataset_id;   // identifiers
@@ -48,6 +105,16 @@ void write_results_hdf5(const vec &solution, const vec &error, const int n, cons
     // note: hdf5 requires parameters to be passed as references
 
     //-----------------------------------------------------------------------------
+
+    // Open another dataset
+    dataset_id = H5Dopen(file_id, "/cpu_per_iter", H5P_DEFAULT);
+
+    // Write the dataset
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &cpu_time_per_iter);
+
+    //-----------------------------------------------------------------------------
+
+
     // Open another dataset
     dataset_id = H5Dopen(file_id, "/tolerance", H5P_DEFAULT);
 

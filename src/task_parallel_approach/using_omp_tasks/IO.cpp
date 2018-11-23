@@ -4,7 +4,7 @@ using vec    = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
 
-void write_results_hdf5(const vec &solution, const vec &error, const int n, const double cpu_time, const double tolerance, const int total_iters)
+void write_results_hdf5(const vec &solution, const vec &error, const int n, const double cpu_time, const double cpu_time_per_iter, const double tolerance, const int total_iters)
 {
 
     hid_t       file_id, dataset_id;   // identifiers
@@ -48,6 +48,16 @@ void write_results_hdf5(const vec &solution, const vec &error, const int n, cons
     // note: hdf5 requires parameters to be passed as references
 
     //-----------------------------------------------------------------------------
+
+    // Open another dataset
+    dataset_id = H5Dopen(file_id, "/cpu_per_iter", H5P_DEFAULT);
+
+    // Write the dataset
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &cpu_time_per_iter);
+
+    //-----------------------------------------------------------------------------
+
+
     // Open another dataset
     dataset_id = H5Dopen(file_id, "/tolerance", H5P_DEFAULT);
 
@@ -121,7 +131,7 @@ void print(const vec &V)
    size_t n = V.size();
    for (size_t i = 0; i < n; i++)
    {
-      double x = V[i];
+      double x = V[i];   
       std::cout << std::fixed << std::setprecision(10) << x << '\n';
    }
    std::cout<< '\n';
@@ -136,7 +146,7 @@ void print(const mat &A)
    {
       for (size_t j = 0; j < n; j++)
       {
-         double x = A[i][j];
+         double x = A[i][j];   
          std::cout << std::fixed << std::setw(10) << std::setprecision(5) << x;
       }
       std::cout << '\n';

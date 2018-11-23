@@ -21,7 +21,7 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 
 int main(int argc, char **argv)
 {
-    int n =  324;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
+    int n =  2304;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
     double error_tol = 1e-4;
     double tolerance = 1e-8; // for cg solver
     std::string matrix_filename = "matrix.txt";
@@ -80,14 +80,15 @@ int main(int argc, char **argv)
         //print(error);
 
         double cpu_time = time.count();
+        double cpu_time_per_iter = cpu_time/total_iters;
 
         std::cout << " CPU time = " << cpu_time << std::endl;
+        std::cout << " CPU time per iter = " << cpu_time_per_iter << std::endl;
 
         //------------------------ Write results to HDF5 file------------------------
-        write_results_hdf5(x, error, n, cpu_time, tolerance, total_iters);
+        write_results_hdf5(x, error, n, cpu_time, cpu_time_per_iter, tolerance, total_iters);
 
     }
-
 
     MPI_Finalize();
 }

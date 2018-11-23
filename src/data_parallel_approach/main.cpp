@@ -21,34 +21,40 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 
 int main(int argc, char **argv)
 {
-    int n =  324;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
+    int n =  576;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
     double error_tol = 1e-4;
     double tolerance = 1e-8; // for cg solver
-    std::string matrix_filename = "matrix.txt";
-    std::string rhs_filename = "rhs.txt";
-    std::string initial_guess_filename = "initial_guess.txt";
+
+    int num_solves = 10;  // number of solves of CG to do, for better statistics of cpu time
+
+//    std::string matrix_filename = "matrix.txt";
+//    std::string rhs_filename = "rhs.txt";
+//    std::string initial_guess_filename = "initial_guess.txt";
+
+    // names inside hd5 files need to be of char format
+    const char *h5_filename = "cg.h5";
+    const char *mat_dataset_name = "matrix";
+    const char *rhs_dataset_name = "rhs";
+    const char *guess_dataset_name = "initial_guess";
 
     MPI_Init (&argc, &argv);
     int nprocs, rank;
     MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 
-    const mat A = read_matrix(n, matrix_filename);  // here is spot where can use hdf5 in the future for i/o
-    const vec b = read_vector(n, rhs_filename);
-    const vec initial_guess = read_vector(n, initial_guess_filename);
+    const mat A = read_mat_hdf5(h5_filename, mat_dataset_name, n);  // here is spot where can use hdf5 in the future for i/o
+    const vec b = read_vec_hdf5(h5_filename, rhs_dataset_name, n);
+    const vec initial_guess = read_vec_hdf5(h5_filename, guess_dataset_name, n);
     int total_iters;
-
-    // NOTE: CONJUGATE GRAD WORKS MUCH NICER WITH SPARSE MATRICES, THAN DENSE ONES!!
-
-    //RECALL THAT I CAN GENERATE LAPALCIAN MATRICES WITH MATLAB, SO COULDD USE THOSE WHEN WANT TO TEST THIS WITH SPARSE MATRICES!
-
-    // NOTE: when testing pick a matrix that acutally is solvable using CG. Use Matlab to test!!!
-    // NOTE: currently the matrix sizes must evenly divide into nprocs...
-    // note: make sure matrix is big enough for thenumber of processors you are using!
+    vec x;
 
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-    vec x = conj_grad_solver(A, b, tolerance, initial_guess, total_iters);  // domain decomposition is done inside the solver
+    for (int i = 0; i < num_solves; i++) {
+
+        x = conj_grad_solver(A, b, tolerance, initial_guess, total_iters);  // domain decomposition is done inside the solver
+
+    }
 
     std::chrono::high_resolution_clock::time_point finish = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> time = std::chrono::duration_cast<std::chrono::duration<double>>(finish-start);
@@ -62,12 +68,12 @@ int main(int argc, char **argv)
         // print(b);
 
         //std::cout << "solution x: " << std::endl;
-        print(x);
+        //print(x);
 
         vec A_times_x(x.size());
         //std::cout << "Check A*x = b " << std::endl;
         mat_times_vec(A, x, A_times_x);
-        print(A_times_x);
+        //print(A_times_x);
 
         //------------------------- Verification Test ----------------------------------------------------------------------
         // we will compare the A*x result to the right hand side
@@ -79,15 +85,17 @@ int main(int argc, char **argv)
             std::cout << "Error in solution is larger than " << error_tol << std::endl;
         //print(error);
 
-        double cpu_time = time.count();
+        double cpu_time = time.count()/num_solves; // is cpu time per CG solve
+        double cpu_time_per_iter = cpu_time/total_iters;
 
-        std::cout << " CPU time = " << cpu_time << std::endl;
+        std::cout << " Total CPU time = " << cpu_time*num_solves << std::endl;
+        std::cout << " CPU time per CG solve = " << cpu_time << std::endl;
+        std::cout << " CPU time per iter = " << cpu_time_per_iter << std::endl;
 
         //------------------------ Write results to HDF5 file------------------------
-        write_results_hdf5(x, error, n, cpu_time, tolerance, total_iters);
+        write_results_hdf5(x, error, n, cpu_time, cpu_time_per_iter, tolerance, total_iters);
 
     }
-
 
     MPI_Finalize();
 }
