@@ -12,6 +12,8 @@ using vec    = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
 vec conj_grad_solver(const mat &A, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters);
+vec conj_grad_solver_omp_tasks(const mat &sub_A, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters);
+vec conj_grad_solver_omp_sections(const mat &sub_A, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters);
 void mat_times_vec(const std::vector<vec> &A, const vec &v, vec &result);
 void vec_lin_combo(double a, const vec &u, double b, const vec &v, vec &result);
 double dot_product(const vec &u, const vec &v);
