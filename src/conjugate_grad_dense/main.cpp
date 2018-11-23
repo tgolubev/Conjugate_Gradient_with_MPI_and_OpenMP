@@ -54,8 +54,8 @@ int main(int argc, char **argv)
 
     for (int i = 0; i < num_solves; i++) {
 
-        //x = conj_grad_solver(sub_A, b, tolerance, initial_guess, total_iters);  // domain decomposition is done inside the solver
-        x = conj_grad_solver_omp_sections(sub_A, b, tolerance, initial_guess, total_iters);
+        x = conj_grad_solver(sub_A, b, tolerance, initial_guess, total_iters);  // domain decomposition is done inside the solver
+        //x = conj_grad_solver_omp_sections(sub_A, b, tolerance, initial_guess, total_iters);
         //x = conj_grad_solver_omp_tasks(sub_A, b, tolerance, initial_guess, total_iters);
 
     }
