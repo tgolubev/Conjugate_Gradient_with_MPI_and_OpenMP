@@ -311,8 +311,11 @@ for Va_cnt = 0:0
     toc
     initial_guess = zeros(size(AV,1), 1);
     
-    h5create('cg_3D_poisson_sparse.h5','/matrix_values',size(values));
-    h5create('cg_3D_poisson_sparse.h5','/col_indices',size(col_indices));
+    % NOTE: WE MUST TRANSPOSE THE MATRICES IN ORDER FOR THE OUTPUT THE HDF5
+    % TO MATCH HOW READING IT IN C++!!!   
+    
+    h5create('cg_3D_poisson_sparse.h5','/matrix_values',size(values.'));
+    h5create('cg_3D_poisson_sparse.h5','/col_indices',size(col_indices.'));
     h5create('cg_3D_poisson_sparse.h5','/solution',size(bV)); % prepare data set for solution
     h5create('cg_3D_poisson_sparse.h5','/initial_guess',size(bV));
     h5create('cg_3D_poisson_sparse.h5','/rhs',size(bV));
@@ -322,8 +325,8 @@ for Va_cnt = 0:0
     h5create('cg_3D_poisson_sparse.h5','/tolerance',1);
     h5create('cg_3D_poisson_sparse.h5','/error',size(bV));
     
-    h5write('cg_3D_poisson_sparse.h5', '/matrix_values', values);
-    h5write('cg_3D_poisson_sparse.h5', '/col_indices', col_indices);
+    h5write('cg_3D_poisson_sparse.h5', '/matrix_values', values.');
+    h5write('cg_3D_poisson_sparse.h5', '/col_indices', col_indices.');
     h5write('cg_3D_poisson_sparse.h5', '/initial_guess',initial_guess);
     h5write('cg_3D_poisson_sparse.h5', '/rhs', bV);
     

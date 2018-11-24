@@ -3,7 +3,7 @@
 using vec    = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
-mat read_sub_mat_hdf5(const char *filename, const char *mat_dataset_name, const int n)
+mat read_sub_mat_hdf5(const char *filename, const char *mat_dataset_name, const int n, const int num_cols)
 {
 
     int nprocs, rank;
@@ -12,8 +12,8 @@ mat read_sub_mat_hdf5(const char *filename, const char *mat_dataset_name, const 
 
     hid_t       file_id, dataset_id;   // identifiers
     herr_t      status;
-    double dset_data[n][n];  // a buffer for reading in the matrix
-    mat matrix(n, std::vector<double>(n));
+    double dset_data[n][num_cols];  // a buffer for reading in the matrix
+    mat matrix(n, std::vector<double>(num_cols));
 
     // I WILL CREATE THE HDF5 FILE in Matlab when I generate the matrix to be solved...,
     // then will open it and add the solution to the dataset
@@ -26,23 +26,19 @@ mat read_sub_mat_hdf5(const char *filename, const char *mat_dataset_name, const 
 
     status = H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, dset_data);
 
-    // fill the matrix
-//    for (int i = 0; i < n; i++)
-//        for (int j = 0; j < n; j++)
-//            matrix[i][j] = dset_data[i][j];
-
-    mat sub_A(n/static_cast<size_t>(nprocs), std::vector<double> (n));  // note: this is the correct way to initialize a vector of vectors.
+    mat sub_A(n/static_cast<size_t>(nprocs), std::vector<double> (num_cols));  // note: this is the correct way to initialize a vector of vectors.
     for (size_t i = 0; i < n/static_cast<size_t>(nprocs); i++)
-        for (size_t j = 0; j < n; j++)
+        for (size_t j = 0; j < num_cols; j++) {
             sub_A[i][j] = dset_data[static_cast<size_t>(rank) * n/static_cast<size_t>(nprocs) + i][j];
-
+            std::cout << i << ", j = " << j << "suba[i][j] = " << sub_A[i][j] << std::endl;
+        }
 
     return sub_A;
 
 }
 
 // full matrix is needed for verification
-mat read_mat_hdf5(const char *filename, const char *mat_dataset_name, const int n)
+mat read_mat_hdf5(const char *filename, const char *mat_dataset_name, const int n, const int num_cols)
 {
 
     int nprocs, rank;
@@ -51,8 +47,8 @@ mat read_mat_hdf5(const char *filename, const char *mat_dataset_name, const int 
 
     hid_t       file_id, dataset_id;   // identifiers
     herr_t      status;
-    double dset_data[n][n];  // a buffer for reading in the matrix
-    mat matrix(n, std::vector<double>(n));
+    double dset_data[n][num_cols];  // a buffer for reading in the matrix
+    mat matrix(n, std::vector<double>(num_cols));
 
     // I WILL CREATE THE HDF5 FILE in Matlab when I generate the matrix to be solved...,
     // then will open it and add the solution to the dataset
@@ -67,7 +63,7 @@ mat read_mat_hdf5(const char *filename, const char *mat_dataset_name, const int 
 
     // fill the matrix
     for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
+        for (int j = 0; j < num_cols; j++)
             matrix[i][j] = dset_data[i][j];
 
     return matrix;
@@ -242,8 +238,8 @@ void print(const vec &V)
 
 void print(const mat &A)
 {
-   size_t m = A.size();
-   size_t n = A[0].size();                      // A is an m x n matrix
+   size_t m = A.size(); // this gives # of rows
+   size_t n = A[0].size();    // gives # of columns                   // A is an m x n matrix
    for (size_t i = 0; i < m; i++)
    {
       for (size_t j = 0; j < n; j++)

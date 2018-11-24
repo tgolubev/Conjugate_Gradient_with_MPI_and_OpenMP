@@ -4,7 +4,7 @@
 % A = delsq(numgrid('S',N)); %sparse matrix
 % b = rand(size(A,1),1);  % use random #'s btw 0 and 1 for rhs
 
-n1 = 1584; % size of square matrix
+n1 = 20; % size of square matrix
 A = gallery('moler',n1);  %dense matrix
 b = sum(A,2);
 
@@ -28,8 +28,14 @@ x = pcg(A_dense, b, 1e-8, 10000);
 
 toc
 
+  % NOTE: WE MUST TRANSPOSE THE MATRICES IN ORDER FOR THE OUTPUT THE HDF5
+    % TO MATCH HOW READING IT IN C++!!!   
+    
+    %but doesn't really matter for this 'moler' matrix b/c is a special
+    %matrix which is the same as its transpose!
+
 % save to HDF5 file
-h5create('cg.h5','/matrix',size(A_dense));
+h5create('cg.h5','/matrix',size(A_dense.'));
 h5create('cg.h5','/solution',size(x)); % prepare data set for solution
 h5create('cg.h5','/initial_guess',size(x));
 h5create('cg.h5','/rhs',size(x));
@@ -39,7 +45,7 @@ h5create('cg.h5','/num_iters',1); %store number of iters it took to solve
 h5create('cg.h5','/tolerance',1);
 h5create('cg.h5','/error',size(x));
 
-h5write('cg.h5', '/matrix', A_dense);
+h5write('cg.h5', '/matrix', A_dense.');
 h5write('cg.h5', '/initial_guess',initial_guess);
 h5write('cg.h5', '/rhs', b);
 
