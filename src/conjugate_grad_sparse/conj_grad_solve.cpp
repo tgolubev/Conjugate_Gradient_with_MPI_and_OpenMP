@@ -10,17 +10,38 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 
 
 // Matrix times vector
-void mat_times_vec(const std::vector<vec> &sub_A, const vec &v, vec &result)
+void mat_times_vec(const mat &sub_A_values, const mat &sub_A_indices, const vec &v, vec &result)
 {
 
     // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
     // since we are 1D decomposing the matrix by rows
 
-    size_t sub_size = sub_A.size();
+    size_t sub_num_rows = sub_A_values.size();
+    size_t sub_num_cols = sub_A_values[0].size();
 
-#pragma omp parallel for // this is dividing the work among the rows...
-    for (size_t i = 0; i < sub_size; i++) // loop over the rows of the sub matrix
-        result[i] = dot_product(sub_A[i], v);  // dot product of ith row of sub_A with the vector v
+    //vector v is correct
+
+    double dot_prod;
+
+
+    /*
+    for (int i = 0; i < sub_num_rows; i++) {
+        for (int j = 0; j < sub_num_cols; j++)
+            std::cout << sub_A_values[i][j] << std::endl;
+        std::cout << std::endl;
+    }
+    */
+
+
+#pragma omp parallel for private(dot_prod) // this is dividing the work among the rows...
+    for (size_t i = 0; i < sub_num_rows; i++) { // loop over the rows of the sub matrix
+        dot_prod = 0;  // rezero the dot_prod buffer. we need this buffer so we can make it private to the thread to avoid race conditions.
+        for (size_t j = 0; j < sub_num_cols; j++) {
+            dot_prod += sub_A_values[i][j] * v[sub_A_indices[i][j]-1]; // -1 here b/c matlab indexes from 1 // dot product of ith row of sub_A with the vector v
+        }
+        result[i] = dot_prod;
+    }
+
 
 }
 
@@ -86,7 +107,7 @@ double mpi_vector_norm(const vec &sub_v)
 }
 
 
-vec conj_grad_solver(const mat &sub_A, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
+vec conj_grad_solver(const mat &sub_A_values, const mat &sub_A_indices, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
 {
 
     // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
@@ -106,23 +127,6 @@ vec conj_grad_solver(const mat &sub_A, const vec &b, const double tolerance, con
         row_cnt[i] = m/nprocs;
         row_disp[i] = i * m/nprocs;  // NOTE: this is assuming that rank 0 is also doing work. LATER I MIGHT MAKE rank 0 be a master and only doing initializations.
     }
-
-
-//    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-
-//    mat sub_A(m/static_cast<size_t>(nprocs), std::vector<double> (m));  // note: this is the correct way to initialize a vector of vectors.
-//    // note: A[0].size() gives # of elements in 1st row = # of columns
-//    // this is #rows/nprocs for the row #, and column # is same as in A
-//    for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++)
-//        for (size_t j = 0; j < m; j++)
-//            sub_A[i][j] = A[static_cast<size_t>(rank) * m/static_cast<size_t>(nprocs) + i][j];
-
-//    std::chrono::high_resolution_clock::time_point finish = std::chrono::high_resolution_clock::now();
-//    std::chrono::duration<double> time = std::chrono::duration_cast<std::chrono::duration<double>>(finish-start);
-
-//    double cpu_time = time.count();
-
-//    std::cout << "cpu time for dividing matrix " << cpu_time << std::endl;
 
     vec sub_x(m/static_cast<size_t>(nprocs)); // this is for the initial guess
 
@@ -154,7 +158,7 @@ vec conj_grad_solver(const mat &sub_A, const vec &b, const double tolerance, con
         r_old = sub_r;                 // Store previous residual
         sub_r_sqrd_old = sub_r_sqrd;  // save a recalculation of r_old^2 later
 
-        mat_times_vec(sub_A, p, sub_a_times_p);  //split up with MPI and then finer parallelize with openmp
+        mat_times_vec(sub_A_values, sub_A_indices, p, sub_a_times_p);  //split up with MPI and then finer parallelize with openmp
 
         sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
 
@@ -197,7 +201,7 @@ vec conj_grad_solver(const mat &sub_A, const vec &b, const double tolerance, con
 
 //--------------------------------------------------------------------------------------------------------------------------
 
-vec conj_grad_solver_omp_tasks(const mat &sub_A, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
+vec conj_grad_solver_omp_tasks(const mat &sub_A_values, const mat &sub_A_indices, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
 {
 
     // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
@@ -248,7 +252,7 @@ vec conj_grad_solver_omp_tasks(const mat &sub_A, const vec &b, const double tole
         r_old = sub_r;                 // Store previous residual
         sub_r_sqrd_old = sub_r_sqrd;  // save a recalculation of r_old^2 later
 
-        mat_times_vec(sub_A, p, sub_a_times_p);  //split up with MPI and then finer parallelize with openmp
+        mat_times_vec(sub_A_values, sub_A_indices, p, sub_a_times_p);  //split up with MPI and then finer parallelize with openmp
 
         sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
 
@@ -305,7 +309,7 @@ vec conj_grad_solver_omp_tasks(const mat &sub_A, const vec &b, const double tole
 
 //--------------------------------------------------------------------------------------------------------------------------
 
-vec conj_grad_solver_omp_sections(const mat &sub_A, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
+vec conj_grad_solver_omp_sections(const mat &sub_A_values, const mat &sub_A_indices, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
 {
 
     // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
@@ -356,7 +360,7 @@ vec conj_grad_solver_omp_sections(const mat &sub_A, const vec &b, const double t
         r_old = sub_r;                 // Store previous residual
         sub_r_sqrd_old = sub_r_sqrd;  // save a recalculation of r_old^2 later
 
-        mat_times_vec(sub_A, p, sub_a_times_p);  //split up with MPI and then finer parallelize with openmp
+        mat_times_vec(sub_A_values, sub_A_indices, p, sub_a_times_p);  //split up with MPI and then finer parallelize with openmp
 
         sub_p_by_ap = mpi_dot_product(sub_p, sub_a_times_p);
 
