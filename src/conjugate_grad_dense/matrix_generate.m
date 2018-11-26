@@ -4,7 +4,7 @@
 % A = delsq(numgrid('S',N)); %sparse matrix
 % b = rand(size(A,1),1);  % use random #'s btw 0 and 1 for rhs
 
-n1 = 20; % size of square matrix
+n1 = 4000; % size of square matrix
 A = gallery('moler',n1);  %dense matrix
 b = sum(A,2);
 

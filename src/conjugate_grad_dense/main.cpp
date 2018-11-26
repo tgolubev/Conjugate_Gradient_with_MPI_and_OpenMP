@@ -21,11 +21,11 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 
 int main(int argc, char **argv)
 {
-    int n =  20;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
+    int n =  4000;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
     double error_tol = 1e-4;
     double tolerance = 1e-8; // for cg solver
 
-    int num_solves = 10;  // number of solves of CG to do, for better statistics of cpu time
+    int num_solves = 3;  // number of solves of CG to do, for better statistics of cpu time
 
 //    std::string matrix_filename = "matrix.txt";
 //    std::string rhs_filename = "rhs.txt";

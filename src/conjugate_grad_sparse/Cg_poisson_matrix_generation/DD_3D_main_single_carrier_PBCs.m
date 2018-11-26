@@ -54,7 +54,7 @@ tolerance = 5*10^-12;        %error tolerance
 tolerance_i =  5*10^-12;     %initial error tolerance, will be increased if can't converge to this level
 
 %% System Setup
-L = 12.0000001e-9;     %there's some integer rounding issue, so use this .0000001
+L = 64.0000001e-9;     %there's some integer rounding issue, so use this .0000001
 dx = 1e-9;                        %mesh size
 num_cell = floor(L/dx);
 N = num_cell -1;       %number of INTERIOR mesh points (total mesh pts = num_cell +1 b/c matlab indixes from 1)
@@ -84,16 +84,7 @@ tic
 
 %Preallocate vectors and matrices
 fullV = zeros(N+2, N+2, N+2);
-fullp = zeros(N+2, N+2, N+2);
-% fulln = zeros(N+2, N+2, N+2);
-Jp_Z = zeros(num_cell, num_cell, num_cell);
-Jn_Z = zeros(num_cell, num_cell, num_cell);
-Jp_X = zeros(num_cell, num_cell, num_cell);
-% Jn_X = zeros(num_cell, num_cell, num_cell);
-% Jp_Y = zeros(num_cell, num_cell, num_cell);
-% Jn_Y = zeros(num_cell, num_cell, num_cell);
 V_values = zeros(num_V+1,1);
-J_total_Z_middle = zeros(num_V+1,1);
 
 % Relative dielectric constant matrix (can be position dependent)
 %Epsilons are defined at 1/2 integer points, so epsilons inside
@@ -132,55 +123,8 @@ end
 %HAVE CONTINOUS EPSILONG IN THOSE DIRECTIONS to extend them periodically
 % so I just added another element to j and k in above loop
 
-
-%-----------------Mobilities setup-----------------------------------------
-% Define mobilities matrix (can be position dependent)
-p_mob = (4.5*10^-6)*ones(num_cell+2, num_cell+2, num_cell+2);
-% n_mob = p_mob;
-
-mobil = 5.*10^-6;        %scaling for mobility
-
-p_mob = p_mob./mobil;
-% n_mob = n_mob./mobil;
-
-%Pre-calculate the mobility averages
-%using indexing: i+1/2 is defined as i+1 for index, just like the epsilons
-p_mob_avged.p_mob_X_avg = zeros(num_cell+2, num_cell+2, num_cell+1);
-p_mob_avged.p_mob_Y_avg = zeros(num_cell+2, num_cell+2, num_cell+1);
-p_mob_avged.p_mob_Z_avg = zeros(num_cell+2, num_cell+2, num_cell+1);
-
-% n_mob_avged.n_mob_X_avg = zeros(num_cell+1, num_cell+1, num_cell+1);
-% n_mob_avged.n_mob_Y_avg = zeros(num_cell+1, num_cell+1, num_cell+1);
-% n_mob_avged.n_mob_Z_avg = zeros(num_cell+1, num_cell+1, num_cell+1);
-
-for i =  1:num_cell+1   %go extra +1 so matches size with Bernoulli fnc's which multiply by
-    for j = 1:num_cell+1  %to account for extra bndry pt added at right side
-        for k = 1:num_cell+1
-            p_mob_avged.p_mob_X_avg(i,j,k) = (p_mob(i,j,k) + p_mob(i,j+1,k) + p_mob(i,j,k+1) + p_mob(i,j+1,k+1))./4.;
-            p_mob_avged.p_mob_Y_avg(i,j,k) = (p_mob(i,j,k) + p_mob(i+1,j,k) + p_mob(i,j,k+1) + p_mob(i+1,j,k+1))./4.;
-            p_mob_avged.p_mob_Z_avg(i,j,k) = (p_mob(i,j,k) + p_mob(i+1,j,k) + p_mob(i,j+1,k) + p_mob(i+1,j+1,k))./4.;
-            
-            %             n_mob_avged.n_mob_X_avg(i,j,k) = (n_mob(i,j,k) + n_mob(i,j+1,k) + n_mob(i,j,k+1) + n_mob(i,j+1,k+1))./4.;
-            %             n_mob_avged.n_mob_Y_avg(i,j,k) = (n_mob(i,j,k) + n_mob(i+1,j,k) + n_mob(i,j,k+1) + n_mob(i+1,j,k+1))./4.;
-            %             n_mob_avged.n_mob_Z_avg(i,j,k) = (n_mob(i,j,k) + n_mob(i+1,j,k) + n_mob(i,j+1,k) + n_mob(i+1,j+1,k))./4.;
-            %add num_cell+2 values for i to account for extra bndry pt
-            p_mob_avged.p_mob_X_avg(num_cell+2,j,k) = p_mob_avged.p_mob_X_avg(1,j,k);
-            p_mob_avged.p_mob_Y_avg(num_cell+2,j,k) = p_mob_avged.p_mob_Y_avg(1,j,k);
-            p_mob_avged.p_mob_Z_avg(num_cell+2,j,k) = p_mob_avged.p_mob_Z_avg(1,j,k);
-            
-            %add num_cell+2 values for j to account for extra bndry pt
-            p_mob_avged.p_mob_X_avg(i,num_cell+2,k) = p_mob_avged.p_mob_X_avg(i,1,k);
-            p_mob_avged.p_mob_Y_avg(i,num_cell+2,k) = p_mob_avged.p_mob_Y_avg(i,1,k);
-            p_mob_avged.p_mob_Z_avg(i,num_cell+2,k) = p_mob_avged.p_mob_Z_avg(i,1,k);
-        end
-    end
-end
-
-
 %--------------------------------------------------------------------------
 %Scaling coefficients
-Cp = dx^2/(Vt*N_dos*mobil);          %note: scaled p_mob and n_mob are inside matrices
-% Cn = dx^2/(Vt*N_dos*mobil);
 CV = (N_dos*dx^2*q)/(epsilon_0*Vt);    %relative permitivity was moved into the matrix
 
 %% Define Poisson equation boundary conditions and initial conditions
@@ -191,18 +135,6 @@ V_topBC(1:N+2, 1:N+2) = (Vbi)/(2*Vt)-inj_c/Vt;
 diff = (V_topBC(1,1) - V_bottomBC(1,1))/num_cell;
 % V(1:N) = V_bottomBC + diff;  %define V's corresponding to 1st subblock here (1st interior row of system)
 % index = 0;
-V_matrix = zeros(N+1,N+1,N);
-
-%SET UP V_matrix first--> then use permute and (:) to get V--> that will be easier
-for k = 1:N
-    for i = 1:N+1
-        for j = 1:N+1
-            V_matrix(i, j, k) = V_bottomBC(i+1,j+1) +  diff*k;  %note: V_matrix contains just the inside values
-        end
-    end
-end
-permuted_V_matrix = permute(V_matrix, [3 2 1]);
-V = permuted_V_matrix(:);
 
 %-------------------------------------------------------------------------------------------------
 %% Define continuity equn boundary and initial conditions
@@ -217,15 +149,11 @@ min_dense = min(p_bottomBC(1,1), p_topBC(1,1));
 p = min_dense*ones(num_elements, 1);
 % p = n;
 
-%form matrices for easy filling of bp
-% n_matrix = reshape(n,N,N,N);
-p_matrix = reshape(p,N+1,N+1,N);  %this is a reshape before solving, so keep as x,y,z format
-
 %-------------------------------------------------------------------------------------------------
 
 % Set up Poisson matrix equation
 AV = SetAV_3D(epsilon_avged);
-[L,U] = lu(AV);  %do and LU factorization here--> since Poisson matrix doesn't change
+% [L,U] = lu(AV);  %do and LU factorization here--> since Poisson matrix doesn't change
 %this will significantly speed up backslash, on LU factorized matrix
 %spy(AV);  %allows to see matrix structure, very useful!
 
@@ -267,13 +195,11 @@ for Va_cnt = 0:0
     %% Poisson Solve
     bV = SetbV_3D(p, epsilon);
     
-    %solve for V
-    oldV = V;
     
-    newV = U\(L\bV);  %much faster to solve pre-factorized matrix. Not applicable to cont. eqn. b/c matrices keep changing.
+%     newV = U\(L\bV);  %much faster to solve pre-factorized matrix. Not applicable to cont. eqn. b/c matrices keep changing.
     
     
-    dense_AV = full(AV);  % use this if not using compressed storage in C++
+%     dense_AV = full(AV);  % use this if not using compressed storage in C++
     
     % loop through the dense_AV matrix to store the information in
     % compressed row storage (CRS) format
@@ -289,24 +215,27 @@ for Va_cnt = 0:0
     % vector[[colm_indeces[2]] + .....
     % THIS IS FOR SQUARE MATRICES
     
-    for row = 1:size(dense_AV, 1)
+    values = zeros(N^3, 7);
+    col_indices = zeros(N^3, 7);
+    
+    for row = 1:size(AV, 1)
         non_zero_col_cnt = 0;
-        for col = 1:size(dense_AV, 1)
-            if dense_AV(row, col) ~= 0 
+        for col = 1:size(AV, 1)
+            if AV(row, col) ~= 0 
                 non_zero_col_cnt = non_zero_col_cnt + 1;
-                values(row, non_zero_col_cnt) = dense_AV(row, col);
+                values(row, non_zero_col_cnt) = AV(row, col);
                 col_indices(row, non_zero_col_cnt) = col;
             end
         end
     end
                 
-    values
-    col_indices
+    values;
+    col_indices;
    
 
     tic
     
-    pcg(AV, bV, 1e-8);
+%     pcg(AV, bV, 1e-8);
     
     toc
     initial_guess = zeros(size(AV,1), 1);
