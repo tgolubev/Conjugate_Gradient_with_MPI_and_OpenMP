@@ -32,9 +32,10 @@
 *.txt
 *.h5
 
-# excel
-*.xlsx
-*.pptx
+# images
+*.jpg
+*.tif
+
 
 #QT builds
 *.stash

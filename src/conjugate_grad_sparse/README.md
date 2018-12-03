@@ -40,3 +40,20 @@ In Linus terminal:
    {
       printf("Num OpenMP threads: %d\n", omp_get_num_threads());
    }
+
+   
+   
+## Running Matlab on HPCC for benchmarking
+
+login to hpcc using the -X so can get the Matlab GUI later
+    module load MATLAB
+    matlab
+
+This will pop up a regular Matlab GUI
+
+Matlab does automatic multithreading of its funcitons such as CG. To control number of threads use:
+
+LASTN = maxNumCompThreads(N)  // N is the max # of threads you want. It will return the last value of N.
+
+
+

@@ -18,6 +18,7 @@ void mat_times_vec(const std::vector<vec> &sub_A, const vec &v, vec &result)
 
     size_t sub_size = sub_A.size();
 
+//#pragma omp simd  //report confirms that this was simd vectorized
 #pragma omp parallel for // this is dividing the work among the rows...
     for (size_t i = 0; i < sub_size; i++) // loop over the rows of the sub matrix
         result[i] = dot_product(sub_A[i], v);  // dot product of ith row of sub_A with the vector v
@@ -213,7 +214,7 @@ vec conj_grad_solver_omp_tasks(const mat &sub_A, const vec &b, const double tole
     int row_disp[nprocs];  // displacement from start of vector, needed for gatherv
     size_t m = b.size();
 
-    for (int i = 0; i < nprocs; i++) {
+    for (int i = 0; i < nprocs; i++) {  //THIS LOOP GETS AUTO VECTORIZED
         row_cnt[i] = m/nprocs;
         row_disp[i] = i * m/nprocs;  // NOTE: this is assuming that rank 0 is also doing work. LATER I MIGHT MAKE rank 0 be a master and only doing initializations.
     }
@@ -222,7 +223,7 @@ vec conj_grad_solver_omp_tasks(const mat &sub_A, const vec &b, const double tole
 
     // we want a decomposed r and initial guess
     vec sub_r(m/static_cast<size_t>(nprocs));
-    for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++) {
+    for (size_t i = 0; i < m/static_cast<size_t>(nprocs); i++) {  // THIS LOOP GETS AUTO VECTORIZED
         sub_r[i] = b[(m/static_cast<size_t>(nprocs))*static_cast<size_t>(rank) + i];
         sub_x[i] = initial_guess[(m/static_cast<size_t>(nprocs))*static_cast<size_t>(rank) + i];
     }

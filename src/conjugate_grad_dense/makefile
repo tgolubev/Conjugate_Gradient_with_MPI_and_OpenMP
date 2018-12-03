@@ -1,6 +1,6 @@
 # Comment lines
 # Here we define compiler option, libraries and the target
-FLAGS = -O3 -Wall -fopenmp
+FLAGS = -O3 -qopt-report -Wall -fopenmp
 
 # Here we make the executable file
 SRCS =   main.cpp IO.cpp conj_grad_solve.cpp

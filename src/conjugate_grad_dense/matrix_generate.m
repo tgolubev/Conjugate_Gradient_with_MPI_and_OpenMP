@@ -4,7 +4,7 @@
 % A = delsq(numgrid('S',N)); %sparse matrix
 % b = rand(size(A,1),1);  % use random #'s btw 0 and 1 for rhs
 
-n1 = 4000; % size of square matrix
+n1 = 4913; % size of square matrix
 A = gallery('moler',n1);  %dense matrix
 b = sum(A,2);
 
@@ -14,6 +14,8 @@ x = pcg(A, b, 1e-8, 10000);
 
 toc
 
+
+
 % cholesky factorization
 % A_factorized = ichol(A)
 
@@ -22,11 +24,11 @@ A_dense = full(A);
 
 initial_guess = zeros(size(A,1), 1);
 
-tic
-
-x = pcg(A_dense, b, 1e-8, 10000);
-
-toc
+% tic
+% 
+% x = pcg(A_dense, b, 1e-8, 10000);
+% 
+% toc
 
   % NOTE: WE MUST TRANSPOSE THE MATRICES IN ORDER FOR THE OUTPUT THE HDF5
     % TO MATCH HOW READING IT IN C++!!!   

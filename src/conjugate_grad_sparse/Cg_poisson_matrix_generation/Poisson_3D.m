@@ -1,6 +1,6 @@
 % 3D poisson equation solving for benchmarking
 
-n = 24;
+n = 5;
 h = 1;
 h = 1/(n+1);
 x = h:h:1-h;

@@ -21,7 +21,7 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 
 int main(int argc, char **argv)
 {
-    int n =  4913;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
+    int n =  13824;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
     int num_cols = 7;  // this will determine # of columns in the matrices stored in CRS form
     double error_tol = 1e-4;
     double tolerance = 1e-8; // for cg solver

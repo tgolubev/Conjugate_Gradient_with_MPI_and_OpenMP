@@ -52,6 +52,7 @@ void vec_lin_combo(double a, const vec &u, double b, const vec &v, vec &result)
 
     //#pragma omp parallel for  //NOTE: IT seems FASTER WITHOUT THIS PRAGMA!!, at least for smaller matrices
     // overhead of creating threads is larger than operation
+    //CAN SIMD THIS!
     for (size_t j = 0; j < n; j++)
         result[j] = a * u[j] + b * v[j];
 }
