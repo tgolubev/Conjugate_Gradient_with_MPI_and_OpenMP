@@ -37,6 +37,7 @@
 *.tif
 
 
+
 #QT builds
 *.stash
 *.pdb
@@ -46,3 +47,13 @@
 *.user
 *.pro
 *.pro.user
+
+# Auxilary tex files
+*.aux 
+*.log
+*.out 
+*.gz
+*.bbl
+*.blg
+
+
