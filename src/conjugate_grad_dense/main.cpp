@@ -1,3 +1,26 @@
+/****************************************************************************************************
+                             Parallel Conjugate Gradient Solver
+
+                                  Author: Timofey Golubev
+
+ A parallel implementation of the conjugate gradient algorithm using a hybrid of distributed (MPI)
+ and shared (OpenMP) memory approach for dense matrices.
+
+MPI and OpenMP features used:
+* MPI_Allreduce for dot products
+* MPI_Allgatherv for matrix-vector product
+* MPI_Gatherv to get solution vector
+* omp parallel for and/or omp simd in matrix-vector product
+* omp parallel for reduction for sub-vector dot products
+
+Files in Hierarchical Data Format (HDF5) are used for parallel I/O and each node reads only the portion
+of the matrix which it needs.
+
+For more details, please see the report at:
+https://github.com/tgolubev/Conjugate_Gradient_with_MPI_and_OpenMP/tree/master/report
+
+***************************************************************************************************/
+
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -22,14 +45,15 @@ using mat = std::vector<vec>;            // matrix (=collection of (row) vectors
 int main(int argc, char **argv)
 {
     int n =  2824;  // size of the matrix --> later can make this a command line argument,--> I.e. as for this input...
-    double error_tol = 1e-4;
-    double tolerance = 1e-8; // for cg solver
+    double error_tol = 1e-8;
+    double tolerance = 1e-8;
 
     int num_solves = 3;  // number of solves of CG to do, for better statistics of cpu time
 
-//    std::string matrix_filename = "matrix.txt";
-//    std::string rhs_filename = "rhs.txt";
-//    std::string initial_guess_filename = "initial_guess.txt";
+//   If want to use txt files:
+//   std::string matrix_filename = "matrix.txt";
+//   std::string rhs_filename = "rhs.txt";
+//   std::string initial_guess_filename = "initial_guess.txt";
 
     // names inside hd5 files need to be of char format
     const char *h5_filename = "cg.h5";
@@ -49,12 +73,14 @@ int main(int argc, char **argv)
     int total_iters;
     vec x;
 
-
+    // Repeat CG solve a few times for statistical average of CPU time
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < num_solves; i++) {
 
-        x = conj_grad_solver(sub_A, b, tolerance, initial_guess, total_iters);  // domain decomposition is done inside the solver
+        // Uncomment the solver which want to use here.
+        // domain decomposition is done inside the solvers
+        x = conj_grad_solver(sub_A, b, tolerance, initial_guess, total_iters);
         //x = conj_grad_solver_omp_sections(sub_A, b, tolerance, initial_guess, total_iters);
         //x = conj_grad_solver_omp_tasks(sub_A, b, tolerance, initial_guess, total_iters);
 
