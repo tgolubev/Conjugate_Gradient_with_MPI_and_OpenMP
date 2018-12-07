@@ -32,38 +32,37 @@ This report is organized as follows. First, the methods used to parallelize the 
 \section{Methods}
 
 \subsection{Conjugate Gradient Algorithm}
-A pseudo-code for the serial CG algorithm for solving the matrix equation $\mathbf{Ax} = \mathbf{b}$ for $\mathbf{x}$, where $\mathbf{A}$ is a symmetric and positive-definite matrix and $\mathbf{b}$ is the right hand side vector is shown below:
+The CG algorithm is in general used to search for the minimum value of a multi-dimensional function. For the case of matrix solving, we are solving the matrix equation $\mathbf{Ax} = \mathbf{b}$ for $\mathbf{x}$, where $\mathbf{A}$ is a symmetric and positive-definite matrix and $\mathbf{b}$ is the right hand side vector. In this case, we are searching for the minimum value of the residual $\mathbf{r} = \mathbf{b} - \mathbf{Ax}$. In each iteration, the estimate of the solution $\mathbf{x}$ is updated by moving a certain amount $\alpha$ along the search direction vector $\mathbf{p}$. The coefficient $\alpha$ is determined by the current iteration's values of $\mathbf{A}$ and $\mathbf{p}$. The search direction is adjusted depending on the change in the norm of the residual which is also used as the convergence check. A pseudo-code is shown below:
 
-\begin{algorithm}
+\begin{algorithm}[H]
 	\begin{algorithmic}[1]
 		\caption{Serial Version}
-		\State $\mathbf{p} = \mathbf{b}$
-		\State $\mathbf{r} = \mathbf{b}$
-		\State $\mathbf{x} = \mathbf{x_0}$
+		\State $\mathbf{p} = \mathbf{b}$  //$\mathbf{p}$ describes possible search directions
+		\State $\mathbf{r} = \mathbf{b} - \mathbf{Ax}$  //residual
+		\State $\mathbf{x} = \mathbf{x_0}$  //start with an initial guess for the solution.
 		
 		\For{$i = 0$ to max\_iter}
 		\State $\mathbf{r_{old}} = \mathbf{r}$
-		\State $\alpha = \frac{\mathbf{r} \cdot \mathbf{r} }{\mathbf{p} \cdot \mathbf{Ap} }$
-		\State //Next estimate of solution:
-		\State $\mathbf{x} = \mathbf{x} + \alpha \mathbf{p}$
-		\State $\mathbf{r} = \mathbf{r} - \alpha \mathbf{Ap}$
+		\State $\alpha = \frac{\mathbf{r} \cdot \mathbf{r} }{\mathbf{p} \cdot \mathbf{Ap} }$ // determines proportion of new search direction to add to solution estimate
+		\State $\mathbf{x} = \mathbf{x} + \alpha \mathbf{p}$  //next estimate of solution
+		\State $\mathbf{r} = \mathbf{r} - \alpha \mathbf{Ap}$ //update the residual: since $\alpha \mathbf{p}$ is what we added to $\mathbf{x}$, this estimates change in $\mathbf{b} - \mathbf{Ax}$. \\
 		\State //Check for convergence:
 		\If{$\mathbf{r} \cdot \mathbf{r} < $ tolerance}
-		\State break
+		\State break \\
 		\EndIf
-		\State $\beta = \frac{\mathbf{r} \cdot \mathbf{r}}{\mathbf{r_{old}} \cdot \mathbf{r_{old}}}$
-		\State $\mathbf{p} = \mathbf{r} + \beta \mathbf{p}$
+		\State $\beta = \frac{\mathbf{r} \cdot \mathbf{r}}{\mathbf{r_{old}} \cdot \mathbf{r_{old}}}$ // determine new change in search direction, depending on change in the residual
+		\State $\mathbf{p} = \mathbf{r} + \beta \mathbf{p}$ // adjust the search direction
 		\EndFor
 		\State Solution is $\mathbf{x}$	
 	\end{algorithmic}
 \end{algorithm}
 
-I will omit discussion of the mathematics behind this method since that is beyond the scope of the goals of this project. For more background on the conjugate gradient algorithm, please refer to the references.
+I will omit discussion of the mathematical proofs behind this method since that is beyond the scope of the goals of this project. For more background on the conjugate gradient algorithm, please refer to the references, especially \cite{CG_no_pain}.
 
 \subsection{Parallelizing the CG Algorithm}
-The CG algorithm is naturally suited for data-based parallelism which means to divide the data and operations on the data among the MPI ranks and OpenMP threads. The other main type of parallelism would be task-based, meaning to have each processor perform a certain different task. As we can see in the above pseudo-code, (almost) each step depends on the previous step so there is not much opportunity for task-based parallelism. Message Passing Interface (MPI) is used by dividing the matrix and vectors into horizontal slices with each rank being responsible for the calculations involving each slice. Additional parallelism is achieved with OpenMP (omp) by multithreading the \texttt{for} loops for the matrix-vector product ($\mathbf{Ap}$), linear combination of vectors, and dot product calculations. The choice of MPI and OpenMP constructs was made by referring to a Parallel Programming textbook \cite{Eijkhout}. A pseudo-code for parallelized algorithm is below:
+The CG algorithm is naturally suited for data-based parallelism which means to divide the data and operations on the data among the MPI ranks and OpenMP threads. The other main type of parallelism would be task-based, meaning to have each processor perform a certain different task. As we can see in the above pseudo-code, (almost) each step depends on the previous step so there is not much opportunity for task-based parallelism. Message Passing Interface (MPI) is used by dividing the matrix and vectors into horizontal slices with each rank being responsible for the calculations involving each slice. Additional parallelism is achieved with OpenMP (omp) by multithreading the \texttt{for} loops for the matrix-vector product ($\mathbf{Ap}$), linear combination of vectors, and dot product calculations. The choice of MPI and OpenMP constructs was made by referring to a Parallel Programming textbook \cite{Eijkhout}. A pseudo-code for the parallelized algorithm is below:
 
-\begin{algorithm}
+\begin{algorithm}[H]
 	\begin{algorithmic}[1]
 		\caption{Parallel Version}
 		\State Divide the matrix and vectors among MPI Ranks
@@ -79,7 +78,7 @@ The CG algorithm is naturally suited for data-based parallelism which means to d
 		\State //Next estimate of solution:
 		\State // Tried \texttt{omp tasks} or \texttt{omp sections} to parallelize the next 2 lines
 		\State $\mathbf{x^{sub}} = \mathbf{x^{sub}} + \alpha \mathbf{p^{sub}}$ // \texttt{omp simd} and/or \texttt{omp parallel for}
-		\State $\mathbf{r^{sub}} = \mathbf{r^{sub}} - \alpha \mathbf{A^{sub}p^{sub}}$
+		\State $\mathbf{r^{sub}} = \mathbf{r^{sub}} - \alpha \mathbf{A\_sub\_p}$
 		\State //Check for convergence:
 		\If{$\mathbf{r^{sub}} \cdot \mathbf{r^{sub}} < $ tolerance}
 		\State break
@@ -148,7 +147,7 @@ The plots in figure \ref{fig:strong_scaling} shows the speedup for the CG soluti
 
 For sparse matrices, we see a different behavior. The highest speedup was achieved by the two ranks case. The speedup also decreases after a certain thread number threshold and these thresholds are as low as two threads. Only for the single rank case, does the speedup increase with number of threads continuously. Dense matrices have a better scaling behavior than the 3D Poisson equation sparse matrices (stored in CRS format) of similar size. This is most likely due to the drastically higher number of operations needed to be done on a dense matrix than a sparse matrix of the same size. For example, for any sized 3D Poisson equation matrix, after converting to CRS, only 7 columns remain. This means that for a 1000x1000 matrix, instead of having to operate on 1 million elements, with CRS format we only need to operate on 7000. The CPU time is generally at least an order of magnitude less than for the same matrix stored in dense format. There is not much speedup gained when parallelizing small to moderately-sized sparse matrices due to the overhead of MPI message passing and OpenMP thread creation being large relative to the limited amount of operations that need to be done. For large sparse matrices, the scaling behavior becomes more similar to the dense matrix case. In this project, we focus on the small to moderately sized matrices because it is more interesting in terms of understanding parallelization behavior and these are the matrix sizes which I (and probably many others) frequently encounter in research work.
 
-For weak scaling, the matrix size was increased proportionally to the number of MPI Ranks used. Figure \ref{fig:Weak_scaling} shows the weak scaling properties. Here I tested the CPU times for several different OpenMP thread numbers as a function of MPI ranks and problem size (determined by number of elements in the matrix) such that the problem size per MPI ranks remains constant. For the sparse matrices, the problem size was determined after converting the matrices to CRS format. An ideal weak scaling would be flat, showing that the CPU time stays constant as the problem size per rank stays constant. Again we see better scaling behavior for dense matrices, with close to flat curves when 4 or less MPI ranks were used. The CPU time starts increasing when 8 ranks were used probably due to significant overhead in the communication which was not compensated enough by the performance gain of using more ranks. Recall that we have to use \texttt{MPI\_Allreduce} and \texttt{MPI\_Allgatherv} which will result in more communication CPU time with larger problem size even when the number of math operations per rank remains the same. For weak scaling we see increasing CPU times due to the lower amount of operations needed on CRS format matrices causing the speedup from additional parallelization to be not enough to compensate for the increased overhead in communication.
+For weak scaling, the matrix size was increased proportionally to the number of MPI Ranks used. Figure \ref{fig:Weak_scaling} shows the weak scaling properties. Here I tested the CPU times for several different OpenMP thread numbers as a function of MPI ranks and problem size (determined by number of elements in the matrix) such that the problem size per MPI rank remains constant. For the sparse matrices, the problem size was determined after converting the matrices to CRS format. An ideal weak scaling would be flat, showing that the CPU time stays constant as the problem size per rank stays constant. Again we see better scaling behavior for dense matrices, with close to flat curves when 4 or less MPI ranks were used. The CPU time starts increasing when 8 ranks were used probably due to significant overhead in the communication which was not compensated enough by the performance gain of using more ranks. Recall that we have to use \texttt{MPI\_Allreduce} and \texttt{MPI\_Allgatherv} which will result in more communication CPU time with larger problem size even when the number of math operations per rank remains the same. For weak scaling we see increasing CPU times due to the lower amount of operations needed on CRS format matrices causing the speedup from additional parallelization to be not enough to compensate for the increased overhead in communication.
 
 
 \begin{figure}[H]
@@ -191,15 +190,12 @@ Several alternative approaches to parallelization were attempted. We will discus
 
 One attempt to achieve additional parallelization was to use \texttt{omp tasks} or \texttt{sections} to simultaneously calculate lines 14 and 15 in Algorithm 2. However, this resulted in approximately the same (within statistically reasonable variations) CPU times as the version without the addition of tasks or sections. This is most likely due to the very low computational effort of the linear combinations of vectors in lines 14 and 15 compared to other portions of the code such as the matrix-vector product. Also parallelization with tasks or sections of these 2 lines could at most achieve 2x speedup of that small section of the code and the individual linear combinations were already parallelized by \texttt{omp parallel for reduction}.
 
-Another attempt was to use Single Instruction Multiple Data (SIMD) vectorization either instead, or in combination with \texttt{omp parallel for}. Compilers vectorize loops automatically, but only if a compiler is sure that the data is independent. OpenMP recently introduced the directive \texttt{omp simd} which tells a compiler to vectorize the loop and ignore any doubts about data dependencies. I concentrated on the matrix-vector product function since that is by far the most CPU intensive portion of the algorithm. When replacing the \texttt{omp parallel for} with \texttt{omp simd}, the result was much slower CPU times. The CPU times were actually about the same as for the single-threaded case. \\\\
+Another attempt was to use Single Instruction Multiple Data (SIMD) vectorization either instead, or in combination with \texttt{omp parallel for}. Compilers vectorize loops automatically, but only if a compiler is sure that the data is independent. OpenMP recently introduced the directive \texttt{omp simd} which tells a compiler to vectorize the loop and ignore any doubts about data dependencies. I concentrated on the matrix-vector product function since that is by far the most CPU intensive portion of the algorithm. When replacing the \texttt{omp parallel for} with \texttt{omp simd}, the result was much slower CPU times. The CPU times were actually about the same as for the single-threaded case. It is also possible to combine SIMD vectorization with an OpenMP parallel for loop by using \texttt{omp parallel for simd}. This resulted in nearly the same CPU times as without the vectorization.
 
-
-DESCRIBE THE REASON FOR THIS!!-->  CHECK IF THE NON-SIMD VERSION, HAS THE MAT-VEC PRODUCT LOOP BEING VECTORIZED!!\\\\
-
-It is also possible to combine SIMD vectorization with an OpenMP parallel for loop by using \texttt{omp parallel for simd}. This resulted in the same CPU times as without the vectorization.
+By looking at the Intel compiler optimization reports, I confirmed that the loop is SIMD vectorized when using a \texttt{simd} directive, but not vectorized without the directive. However, the code timings show that vectorization in this case is not nearly as beneficial as multi-threading. One possible reason for this is the loop could be memory bound, meaning that most of the time is spent accessing the data. In the case of using multiple CPU cores, the cores can access the (different) data simultaneously. However, when using vectorization, it is still the same core trying to access all of the data to perform the multiple instructions. Therefore, we see the same CPU time as for the single threaded case when we try to vectorize instead of using a \texttt{parallel for} loop.
 
 \subsection{Verification and Benchmarks}
-The correctness of the solver was verified by checking that $\mathbf{Ax} – \mathbf{b} < 10^{-8}$ in a unit test included in the code. The solution results when using different numbers of ranks and threads were also manually checked to ensure that they are nearly the same (to within the chosen tolerance of $10^{-8}$) which is sufficiently accurate for most applications) as the serial case. Results were also cross-checked with Matlab’s CG solver (pcg function). Figure \ref{fig:benchmarks} compares the CPU times of the C++ code with Matlab’s solver. We see that the C++ code is faster than Matlab when using 4 or more MPI ranks. Also, the C++ code has more thread-to-thread speedup on one rank than Matlab. Note that Matlab uses highly optimized Fortran libraries which were developed by large teams of people over many years.
+The correctness of the solver was verified by checking that $\mathbf{Ax} – \mathbf{b} < 10^{-8}$ in a unit test included in the code. The solution results when using different numbers of ranks and threads were also manually checked to ensure that they are nearly the same (to within the chosen tolerance of $10^{-8}$ which is sufficiently accurate for most applications) as the serial case. Results were also cross-checked with Matlab’s CG solver (pcg function). Figure \ref{fig:benchmarks} compares the CPU times of the C++ code with Matlab’s solver. We see that the C++ code is faster than Matlab when using 4 or more MPI ranks. Also, the C++ code has more thread-to-thread speedup on one rank than Matlab. Note that Matlab uses highly optimized Fortran libraries which were developed by large teams of people over many years.
 
 \begin{figure}[H]
 	\begin{minipage}[b]{0.5\linewidth}
@@ -210,7 +206,7 @@ The correctness of the solver was verified by checking that $\mathbf{Ax} – \ma
 		\centering
 		\includegraphics[width=1.0\textwidth]{sparse_matrix_benchmarks_report.eps}  
 	\end{minipage}
-	\caption{Benchmarks.}
+	\caption{Comparison benchmarks of CPU Time per CG iteration for solution of dense and sparse matrices using the parallel C++ code versus Matlab's CG solver.}
 	\label{fig:benchmarks}
 \end{figure}
 
@@ -225,7 +221,8 @@ This study demonstrates a straightforward hybrid parallelization of the CG algor
 	\bibitem{Gummel} H. K. Gummel, A self-consistent iterative scheme for one-dimensional steady state transistor calculations. IEEE Transactions on Electron Devices, 11, 1964
 	\bibitem{Gift} Jiebing Sun, Kanokkorn Pimcharoen, Sean R. Wagner, Phillip M. Duxbury, Pengpeng Zhang. Nanoscale imaging of dense fiber morphology and local electrical response in conductive regioregular poly(3-hexylthiophene). Organic Electronics, 15, 2014.
 	\bibitem{openmp_mpi_paper} Luis F. Romero, Eva M. Ortigosa, Sergio Romero, Emilio L. Zapata. Nesting OpenMP and MPI in the Conjugate Gradient Method for Band Systems. In: Kranzlmüller D., Kacsuk P., Dongarra J. (eds) Recent Advances in Parallel Virtual Machine and Message Passing Interface. EuroPVM/MPI 2004. Lecture Notes in Computer Science, vol 3241. Springer, Berlin, Heidelberg
-	\bibitem{mpi_openmp_2} Piero Lanucara, Sergio Rovida. Conjugate-Gradients Algorithms: An MPI-OpenMP Implementation on Distributed Shared Memory Systems. European Workshop on OpenMP, 1999.	
+	\bibitem{mpi_openmp_2} Piero Lanucara, Sergio Rovida. Conjugate-Gradients Algorithms: An MPI-OpenMP Implementation on Distributed Shared Memory Systems. European Workshop on OpenMP, 1999.
+	\bibitem{CG_no_pain} Jonathan R. Shewchuk, An Introduction to the Conjugate Gradient Method Without the Agonizing Pain, 1994. \url{https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf}
 	\bibitem{Eijkhout} Victor Eijkhout. Parallel Programming in MPI and OpenMP, 2017
 	\bibitem{hdf5} \url{https://www.hdfgroup.org/solutions/hdf5/}
 	\bibitem{Ning} Zhao Ning, Wang XuBen. A Parallel Preconditioned Bi-Conjugate Gradient Stabilized Solver for the Poisson Problem. Journal of Computers, 7, 12, 2012.

@@ -19,7 +19,7 @@ void mat_times_vec(const std::vector<vec> &sub_A, const vec &v, vec &result)
     size_t sub_size = sub_A.size();
 
 //#pragma omp simd  //report confirms that this was simd vectorized
-#pragma omp parallel for // this is dividing the work among the rows...
+#pragma omp parallel for simd// this is dividing the work among the rows...
     for (size_t i = 0; i < sub_size; i++) // loop over the rows of the sub matrix
         result[i] = dot_product(sub_A[i], v);  // dot product of ith row of sub_A with the vector v
 
