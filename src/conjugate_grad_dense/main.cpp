@@ -1,5 +1,5 @@
 /****************************************************************************************************
-                             Parallel Conjugate Gradient Solver
+                      Parallel Conjugate Gradient Solver: Dense Matrices
 
                                   Author: Timofey Golubev
 

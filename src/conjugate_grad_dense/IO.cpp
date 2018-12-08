@@ -170,7 +170,6 @@ void write_results_hdf5(const char *filename, const vec &solution, const vec &er
 
 
 
-
 void print(const vec &V)
 {
 

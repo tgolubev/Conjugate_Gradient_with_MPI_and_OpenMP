@@ -177,7 +177,6 @@ vec conj_grad_solver(const mat &sub_A, const vec &b, const double tolerance, con
 
         // We need to update p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
         MPI_Allgatherv(&sub_p.front(), row_cnt[rank], MPI_DOUBLE, &p.front(), row_cnt, row_disp, MPI_DOUBLE, MPI_COMM_WORLD);
-        // need an Allgatherv b/c all procs need the p vector
 
     }
 
@@ -333,7 +332,7 @@ vec conj_grad_solver_omp_sections(const mat &sub_A, const vec &b, const double t
 
     //----------------------------- Main Conugate Gradient Algorithm ----------------------------------------------
 
-    vec x(m);  // iniitalize a vector to store the solution subvector
+    vec x(m);  // initialize a vector to store the solution subvector
     vec p = b;  //we want a full p
     vec sub_p = sub_r; //also we want a sub_p, decomposed to be able to split up the work
     vec r_old;
@@ -392,7 +391,6 @@ vec conj_grad_solver_omp_sections(const mat &sub_A, const vec &b, const double t
 
         // We need to update p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
         MPI_Allgatherv(&sub_p.front(), row_cnt[rank], MPI_DOUBLE, &p.front(), row_cnt, row_disp, MPI_DOUBLE, MPI_COMM_WORLD);
-        // need an Allgatherv b/c all procs need the p vector
 
     }
 

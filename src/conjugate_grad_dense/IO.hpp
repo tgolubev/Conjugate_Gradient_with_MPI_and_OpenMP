@@ -21,7 +21,7 @@
 #include <string>
 #include "hdf5.h"
 
-using vec    = std::vector<double>;       // vector
+using vec    = std::vector<double>;      // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
 
 //! Print a vector to terminal

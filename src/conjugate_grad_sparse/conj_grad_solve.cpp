@@ -1,3 +1,11 @@
+/*****************************************************************************
+ Implementation of the main functions for the parallel Conjugate Gradient solver
+ calculations.
+
+ Author: Timofey Golubev
+
+*******************************************************************************/
+
 #include "conj_grad_solve.hpp"
 #include "IO.hpp"
 #include <omp.h>
@@ -6,7 +14,6 @@
 
 using vec = std::vector<double>;         // vector
 using mat = std::vector<vec>;            // matrix (=collection of (row) vectors)
-
 
 
 // Matrix times vector
@@ -19,29 +26,17 @@ void mat_times_vec(const mat &sub_A_values, const mat &sub_A_indices, const vec 
     size_t sub_num_rows = sub_A_values.size();
     size_t sub_num_cols = sub_A_values[0].size();
 
-    //vector v is correct
-
     double dot_prod;
 
 
-    /*
-    for (int i = 0; i < sub_num_rows; i++) {
-        for (int j = 0; j < sub_num_cols; j++)
-            std::cout << sub_A_values[i][j] << std::endl;
-        std::cout << std::endl;
-    }
-    */
-
-
 #pragma omp parallel for private(dot_prod) // this is dividing the work among the rows...
-    for (size_t i = 0; i < sub_num_rows; i++) { // loop over the rows of the sub matrix
+    for (size_t i = 0; i < sub_num_rows; i++) {
         dot_prod = 0;  // rezero the dot_prod buffer. we need this buffer so we can make it private to the thread to avoid race conditions.
         for (size_t j = 0; j < sub_num_cols; j++) {
             dot_prod += sub_A_values[i][j] * v[sub_A_indices[i][j]-1]; // -1 here b/c matlab indexes from 1 // dot product of ith row of sub_A with the vector v
         }
         result[i] = dot_prod;
     }
-
 
 }
 
@@ -50,9 +45,8 @@ void vec_lin_combo(double a, const vec &u, double b, const vec &v, vec &result)
 {
     size_t n = u.size();
 
-    //#pragma omp parallel for  //NOTE: IT seems FASTER WITHOUT THIS PRAGMA!!, at least for smaller matrices
+    //#pragma omp parallel for  //NOTE: it is faster without this pragma, at least for smaller matrices
     // overhead of creating threads is larger than operation
-    //CAN SIMD THIS!
     for (size_t j = 0; j < n; j++)
         result[j] = a * u[j] + b * v[j];
 }
@@ -71,14 +65,13 @@ double mpi_dot_product(const vec &sub_u, const vec &sub_v) // need to pass it th
     double product;
     size_t length = sub_u.size();
 
-    // trying to parallelize this made it slower (with 10 threads, 2 procs, than w/o the parallelization!)
-    // THAT MIGHT BE B/C THE INNER PRODUCT is a very efficient implementation!! which is hard to beat.
-    //double sub_prod = 0.0;
-    /*#pragma omp parallel for reduction(+:sub_prod)
-   for (size_t i = 0; i < length; i++) {
-       sub_prod += sub_u[i] * sub_v[i];
-   }*/
-    double sub_prod = __gnu_parallel::inner_product(sub_u.begin(), sub_u.end(), sub_v.begin(), 0.0); // last argument is initial value of the sum of products
+    // Explicitely coded OpenMP inner product (other option is to use gnu parallel function
+    double sub_prod = 0.0;
+    #pragma omp parallel for reduction(+:sub_prod)
+    for (size_t i = 0; i < length; i++) {
+        sub_prod += sub_u[i] * sub_v[i];
+    }
+    //double sub_prod = __gnu_parallel::inner_product(sub_u.begin(), sub_u.end(), sub_v.begin(), 0.0); // last argument is initial value of the sum of products
     // using gnu_parallel instead of regular inner_product didin't really speed things up but didint' slow them down either.
 
     // sub_prod works!
@@ -96,6 +89,7 @@ double vector_norm(const vec &v)
     return sqrt(dot_product(v, v));
 }
 
+// norm of a vector that was split up among MPI ranks
 double mpi_vector_norm(const vec &sub_v)
 {
     double norm_r;
@@ -114,12 +108,14 @@ vec conj_grad_solver(const mat &sub_A_values, const mat &sub_A_indices, const ve
     // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
     // since we are 1D decomposing the matrix by rows
     // b will be the full vector
+
     int nprocs, rank;
     MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 
 
-    // Domain decomposition
+    //----------------------------- Domain decomposition ----------------------------------------------
+
     int row_cnt[nprocs];  // to keep track of # of rows in each rank, when not evenly divisible, this can be different
     int row_disp[nprocs];  // displacement from start of vector, needed for gatherv
     size_t m = b.size();
@@ -138,7 +134,7 @@ vec conj_grad_solver(const mat &sub_A_values, const mat &sub_A_indices, const ve
         sub_x[i] = initial_guess[(m/static_cast<size_t>(nprocs))*static_cast<size_t>(rank) + i];
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //----------------------------- Main Conugate Gradient Algorithm ----------------------------------------------
 
     vec x(m);  // iniitalize a vector to store the solution subvector
     vec p = b;  //we want a full p
@@ -150,10 +146,11 @@ vec conj_grad_solver(const mat &sub_A_values, const mat &sub_A_indices, const ve
 
     double sub_r_sqrd, sub_p_by_ap, norm_sub_r, sub_sub_r_sqrd, sub_sub_p_by_ap, alpha, sub_r_sqrd_old, beta;
 
-    // find sub_r_sqrd once for the 1st iter here:
-    sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
+    sub_r_sqrd = mpi_dot_product(sub_r, sub_r);  // find sub_r_sqrd once for the 1st iter here
 
-    for (int i = 0; i < max_iter; i++) {  // this loop must be serial b/c is iterations of conj_grad
+    // Main Conjugate Gradient loop
+    // this loop must be serial b/c CG is an iterative method
+    for (int i = 0; i < max_iter; i++) {
         // note: make sure matrix is big enough for thenumber of processors you are using!
 
         r_old = sub_r;                 // Store previous residual
@@ -187,9 +184,8 @@ vec conj_grad_solver(const mat &sub_A_values, const mat &sub_A_indices, const ve
         vec_lin_combo(1.0, sub_r, beta, sub_p, result3);             // Next gradient
         sub_p = result3;
 
-        // WE NEED TO UPDATE THE p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
+        // We need to update p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
         MPI_Allgatherv(&sub_p.front(), row_cnt[rank], MPI_DOUBLE, &p.front(), row_cnt, row_disp, MPI_DOUBLE, MPI_COMM_WORLD);
-        // need an Allgatherv b/c all procs need the p vector
 
     }
 
@@ -201,19 +197,20 @@ vec conj_grad_solver(const mat &sub_A_values, const mat &sub_A_indices, const ve
 
 
 //--------------------------------------------------------------------------------------------------------------------------
-
+//! CG solver version with using omp tasks
 vec conj_grad_solver_omp_tasks(const mat &sub_A_values, const mat &sub_A_indices, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
 {
 
     // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
     // since we are 1D decomposing the matrix by rows
     // b will be the full vector
+
     int nprocs, rank;
     MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 
 
-    // Domain decomposition
+    //----------------------------- Domain decomposition ------------------------------------------------------
     int row_cnt[nprocs];  // to keep track of # of rows in each rank, when not evenly divisible, this can be different
     int row_disp[nprocs];  // displacement from start of vector, needed for gatherv
     size_t m = b.size();
@@ -232,9 +229,9 @@ vec conj_grad_solver_omp_tasks(const mat &sub_A_values, const mat &sub_A_indices
         sub_x[i] = initial_guess[(m/static_cast<size_t>(nprocs))*static_cast<size_t>(rank) + i];
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //----------------------------- Main Conugate Gradient Algorithm ----------------------------------------------
 
-    vec x(m);  // iniitalize a vector to store the solution subvector
+    vec x(m);   // iniitalize a vector to store the solution subvector
     vec p = b;  //we want a full p
     vec sub_p = sub_r; //also we want a sub_p, decomposed to be able to split up the work
     vec r_old;
@@ -244,9 +241,10 @@ vec conj_grad_solver_omp_tasks(const mat &sub_A_values, const mat &sub_A_indices
 
     double sub_r_sqrd, sub_p_by_ap, norm_sub_r, sub_sub_r_sqrd, sub_sub_p_by_ap, alpha, sub_r_sqrd_old, beta;
 
-    // find sub_r_sqrd once for the 1st iter here:
-    sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
+    sub_r_sqrd = mpi_dot_product(sub_r, sub_r); // find sub_r_sqrd once for the 1st iter here
 
+    // Main Conjugate Gradient loop
+    // this loop must be serial b/c CG is an iterative method
     for (int i = 0; i < max_iter; i++) {  // this loop must be serial b/c is iterations of conj_grad
         // note: make sure matrix is big enough for thenumber of processors you are using!
 
@@ -259,12 +257,12 @@ vec conj_grad_solver_omp_tasks(const mat &sub_A_values, const mat &sub_A_indices
 
         alpha = sub_r_sqrd/sub_p_by_ap;
 
-        // note: overhead for these sections is too much. It is faster without sections.
+        // note: overhead for these tasks is too much. It is faster without sections.
         #pragma omp parallel
         #pragma omp single
         {
 
-                    // Next estimate of solution
+        // Next estimate of solution
         #pragma omp task
                     {
                         vec_lin_combo(1.0, sub_x, alpha, sub_p, result1);
@@ -295,9 +293,8 @@ vec conj_grad_solver_omp_tasks(const mat &sub_A_values, const mat &sub_A_indices
         vec_lin_combo(1.0, sub_r, beta, sub_p, result3);             // Next gradient
         sub_p = result3;
 
-        // WE NEED TO UPDATE THE p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
+        // We need to update p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
         MPI_Allgatherv(&sub_p.front(), row_cnt[rank], MPI_DOUBLE, &p.front(), row_cnt, row_disp, MPI_DOUBLE, MPI_COMM_WORLD);
-        // need an Allgatherv b/c all procs need the p vector
 
     }
 
@@ -309,19 +306,20 @@ vec conj_grad_solver_omp_tasks(const mat &sub_A_values, const mat &sub_A_indices
 
 
 //--------------------------------------------------------------------------------------------------------------------------
-
+//! CG solver version using omp sections
 vec conj_grad_solver_omp_sections(const mat &sub_A_values, const mat &sub_A_indices, const vec &b, const double tolerance, const vec &initial_guess, int &total_iters)  //total_iters is to store # of iters in it
 {
 
     // NOTE: when using MPI with > 1 proc, A will be only a sub-matrix (a subset of rows) of the full matrix
     // since we are 1D decomposing the matrix by rows
     // b will be the full vector
+
     int nprocs, rank;
     MPI_Comm_size (MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank (MPI_COMM_WORLD, &rank);
 
 
-    // Domain decomposition
+    //----------------------------- Domain decomposition ------------------------------------------------------
     int row_cnt[nprocs];  // to keep track of # of rows in each rank, when not evenly divisible, this can be different
     int row_disp[nprocs];  // displacement from start of vector, needed for gatherv
     size_t m = b.size();
@@ -340,9 +338,9 @@ vec conj_grad_solver_omp_sections(const mat &sub_A_values, const mat &sub_A_indi
         sub_x[i] = initial_guess[(m/static_cast<size_t>(nprocs))*static_cast<size_t>(rank) + i];
     }
 
-    //---------------------------------------------------------------------------------------------------------
+    //----------------------------- Main Conugate Gradient Algorithm ----------------------------------------------
 
-    vec x(m);  // iniitalize a vector to store the solution subvector
+    vec x(m);  // initialize a vector to store the solution subvector
     vec p = b;  //we want a full p
     vec sub_p = sub_r; //also we want a sub_p, decomposed to be able to split up the work
     vec r_old;
@@ -352,10 +350,11 @@ vec conj_grad_solver_omp_sections(const mat &sub_A_values, const mat &sub_A_indi
 
     double sub_r_sqrd, sub_p_by_ap, norm_sub_r, sub_sub_r_sqrd, sub_sub_p_by_ap, alpha, sub_r_sqrd_old, beta;
 
-    // find sub_r_sqrd once for the 1st iter here:
-    sub_r_sqrd = mpi_dot_product(sub_r, sub_r);
+    sub_r_sqrd = mpi_dot_product(sub_r, sub_r); // find sub_r_sqrd once for the 1st iter here
 
-    for (int i = 0; i < max_iter; i++) {  // this loop must be serial b/c is iterations of conj_grad
+    // Main Conjugate Gradient loop
+    // this loop must be serial b/c CG is an iterative method
+    for (int i = 0; i < max_iter; i++) {
         // note: make sure matrix is big enough for thenumber of processors you are using!
 
         r_old = sub_r;                 // Store previous residual
@@ -368,10 +367,8 @@ vec conj_grad_solver_omp_sections(const mat &sub_A_values, const mat &sub_A_indi
         alpha = sub_r_sqrd/sub_p_by_ap;
 
         // note: overhead for these sections is too much. It is faster without sections.
-        // note: overhead for these sections is too much. It is faster without sections.
         #pragma omp parallel sections
         {
-
                     #pragma omp section
                    {
                        vec_lin_combo(1.0, sub_x, alpha, sub_p, result1); // NOTE: need to label these as result1 and 2 since need them to not conflict when run in parallel!
@@ -400,9 +397,8 @@ vec conj_grad_solver_omp_sections(const mat &sub_A_values, const mat &sub_A_indi
         vec_lin_combo(1.0, sub_r, beta, sub_p, result3);             // Next gradient
         sub_p = result3;
 
-        // WE NEED TO UPDATE THE p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
+        // We need to update p (full vector)  value  through a gather!! for the next iteration b/c it's needed in mat_times_vec
         MPI_Allgatherv(&sub_p.front(), row_cnt[rank], MPI_DOUBLE, &p.front(), row_cnt, row_disp, MPI_DOUBLE, MPI_COMM_WORLD);
-        // need an Allgatherv b/c all procs need the p vector
 
     }
 
